@@ -32,10 +32,7 @@ try {
       const output = await bundle(`${entry.replaceAll("/", "-")}-${style}`, source);
       assert(!output.includes("NormalizationError"), "unused cause normalization retained");
       assert(!output.includes("getOwnPropertyDescriptor"), "unused validation retained");
-      assert(
-        !output.includes("normalizeCause") && !output.includes("define"),
-        "unused helpers retained",
-      );
+      assert(!output.includes("normalizeCause"), "unused normalization retained");
       // Baseline ~100 bytes; allow modest changes without accepting accidental helper inclusion.
       assert(
         Buffer.byteLength(output) < 512,

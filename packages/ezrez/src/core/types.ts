@@ -7,30 +7,38 @@ export type JsonValue =
   | readonly JsonValue[]
   | { readonly [key: string]: JsonValue };
 
+export type ErrorContext = Readonly<Record<string, JsonValue>>;
+
 export type ErrorSnapshot = Readonly<{
   name: string;
   message: string;
   stack?: string;
   cause: ErrorSnapshot | null;
-  context?: Readonly<Record<string, JsonValue>>;
+  context?: ErrorContext;
 }>;
 
+/** An error snapshot whose application context is known to be present and typed. */
+export type ErrorSnapshotWithContext<C extends ErrorContext> = Omit<ErrorSnapshot, "context"> & {
+  context: C;
+};
+
 /** Normalized native error carried by a failure result. */
-export type Failure = Readonly<{
-  cause: ErrorSnapshot;
+export type Failure<Cause extends ErrorSnapshot = ErrorSnapshot> = Readonly<{
+  cause: Cause;
 }>;
 
 export type Ok<S> = Readonly<{ tag: "success"; value: S; cause?: never }>;
 
-/** A failure envelope always contains a normalized error snapshot. */
-export type Fail<Tag extends string> = Tag extends "success"
-  ? never
-  : Readonly<{ tag: Tag; cause: ErrorSnapshot; value?: never }>;
+/** A failure envelope preserves the type of its correlated error snapshot. */
+export type Fail<
+  Tag extends string,
+  Cause extends ErrorSnapshot = ErrorSnapshot,
+> = Tag extends "success" ? never : Readonly<{ tag: Tag; cause: Cause; value?: never }>;
 
 /** Failure result for one tag or a union of tags. */
 export type EzFailOf<T extends string> = T extends string ? Fail<T> : never;
 
-type AnyFailure = Fail<string>;
+type AnyFailure = Fail<string, ErrorSnapshot>;
 
 /** Expand tag shorthand while retaining complete failure envelopes. */
 type ResolveFailure<E extends string | AnyFailure> = E extends string
@@ -54,19 +62,21 @@ export type Normalize<R extends AnyResult> = EzRez<SuccessOf<R>, ErrorOf<R>>;
 /** Flattens intersections while preserving the visible shape of a type. */
 export type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
-type SimplifyFailure<E extends AnyFailure> = E extends AnyFailure ? E["tag"] : never;
-
-/** Concise public result type for inferred functions. */
-export type Simplified<R extends AnyResult> = EzRez<SuccessOf<R>, SimplifyFailure<ErrorOf<R>>>;
-
 /** Overrides merged into the default `{ name: "Error", message: tag, cause: null }` snapshot. */
 export type ErrorDescriptor = Readonly<{
   name?: string | undefined;
   message?: string | undefined;
   stack?: string | undefined;
   cause?: unknown;
-  context?: Readonly<Record<string, JsonValue>> | undefined;
+  context?: ErrorContext | undefined;
 }>;
+
+type DescriptorCause<D> = D extends { context: infer C extends ErrorContext }
+  ? ErrorSnapshotWithContext<C>
+  : ErrorSnapshot;
+
+/** Infers the normalized primary snapshot type produced by a failure descriptor. */
+export type FailureCause<D> = D extends Error ? ErrorSnapshot : DescriptorCause<D>;
 
 /** Constructor shorthand or an inline tagged error descriptor. */
 export type FailureInput<Tag extends string = string> =
@@ -77,5 +87,5 @@ export type FailureInput<Tag extends string = string> =
 export type WithCause<F extends FailureInput> = F extends string
   ? Fail<F>
   : F extends { tag: infer Tag extends string }
-    ? Fail<Tag>
+    ? Fail<Tag, FailureCause<F>>
     : never;

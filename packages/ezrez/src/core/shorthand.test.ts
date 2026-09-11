@@ -1,7 +1,6 @@
 import { expect, expectTypeOf, it } from "vitest";
-import { define } from "../utils/define.js";
 import { fail, isError, isEzRez, isSuccess, ok } from "./index.js";
-import type { ErrorOf, ErrorSnapshot, EzFailOf, EzRez, Fail, Ok, Simplified } from "./index.js";
+import type { ErrorOf, ErrorSnapshot, EzFailOf, EzRez, Fail, Ok } from "./index.js";
 
 type MathTag = "DIVIDE_BY_ZERO" | "TOO_BIG_NUMBER" | "SOMETHING_ELSE";
 type MathFailure = EzFailOf<MathTag>;
@@ -35,15 +34,12 @@ it("distributes tag unions into failure payloads and preserves impossible branch
   expectTypeOf<EzRez<never, never>>().toEqualTypeOf<never>();
 });
 
-it("works with native inference, explicit annotations, define and branch guards", () => {
+it("works with native inference, explicit annotations and branch guards", () => {
   const native = (a: number, b: number) => (b === 0 ? fail({ tag: "DIVIDE_BY_ZERO" }) : ok(a / b));
   const annotated: (a: number, b: number) => EzRez<number, "DIVIDE_BY_ZERO"> = native;
-  const wrapped = define(native);
   expectTypeOf<ErrorOf<ReturnType<typeof native>>["tag"]>().toEqualTypeOf<"DIVIDE_BY_ZERO">();
-  expectTypeOf(wrapped).returns.toEqualTypeOf<Simplified<ReturnType<typeof native>>>();
-  expectTypeOf(wrapped).toExtend<typeof annotated>();
-  expectTypeOf(define(divide)).returns.toEqualTypeOf<EzRez<number, MathTag>>();
-  expect(wrapped(6, 0)).toEqual(annotated(6, 0));
+  expectTypeOf(native).toExtend<typeof annotated>();
+  expect(native(6, 0)).toEqual(annotated(6, 0));
   const result = divide(6, 0);
   if (isError(result)) expectTypeOf(result.cause).toEqualTypeOf<ErrorSnapshot>();
   if (isSuccess(result)) expectTypeOf(result.value).toEqualTypeOf<number>();
@@ -60,6 +56,18 @@ it("keeps diagnostic context owned by the normalized native error", () => {
   for (const transported of [JSON.parse(JSON.stringify(result)), structuredClone(result)]) {
     expect(transported).toEqual(result);
     expect(isEzRez(transported)).toBe(true);
+  }
+});
+
+it("keeps descriptor context correlated with its failure tag", () => {
+  const parsePort = (input: string) => {
+    if (!Number.isInteger(Number(input))) return fail("INVALID_PORT", { context: { input } });
+    return ok(Number(input));
+  };
+  const result = parsePort("bad");
+  if (isError(result) && result.tag === "INVALID_PORT") {
+    expectTypeOf(result.cause.context.input).toEqualTypeOf<string>();
+    expect(result.cause.context.input).toBe("bad");
   }
 });
 
