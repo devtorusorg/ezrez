@@ -36,7 +36,7 @@ import * as ezrez from "@devtorus/ezrez";
 ```ts
 import * as ez from "ezrez";           // Core + utilities
 import * as core from "ezrez/core";    // Constructors, guards and types only
-import * as utils from "ezrez/utils";  // define and normalizeCause
+import * as utils from "ezrez/utils";  // normalizeCause
 // Named imports work too:
 import { ok, fail, type EzRez } from "ezrez/core";
 ```
@@ -112,7 +112,7 @@ widened to `string`; constructors cannot recover lost literals.
 ### Shorthand error types
 
 ```ts
-import { define, fail, ok, type EzFailOf, type EzRez } from "ezrez";
+import { fail, ok, type EzFailOf, type EzRez } from "ezrez";
 
 type DivideByZeroFailure = EzFailOf<"DIVIDE_BY_ZERO">;
 // Readonly<{
@@ -130,11 +130,9 @@ function divide(a: number, b: number): EzRez<number, "DIVIDE_BY_ZERO" | "TOO_BIG
   return ok(a / b);
 }
 
-// Optional return-type normalization; native inference is also supported directly.
-const easytype = define(divide);
 type ResultByTags = EzRez<number, "DIVIDE_BY_ZERO" | "TOO_BIG_NUMBER">;
-type ResultByHelper = EzRez<number, EzFailOf<"DIVIDE_BY_ZERO" | "TOO_BIG_NUMBER">>;
-// ResultByTags and ResultByHelper are equivalent.
+type ResultByExplicitFailures = EzRez<number, EzFailOf<"DIVIDE_BY_ZERO" | "TOO_BIG_NUMBER">>;
+// ResultByTags and ResultByExplicitFailures are equivalent.
 
 type OnlyZero = Extract<MathFailure, { tag: "DIVIDE_BY_ZERO" }>;
 ```
@@ -142,7 +140,7 @@ type OnlyZero = Extract<MathFailure, { tag: "DIVIDE_BY_ZERO" }>;
 `EzFailOf` distributes over string unions, so extraction and narrowing work per tag.
 `EzFailOf<never>` is `never`; the error parameter of `EzRez` still defaults to `never`.
 `ErrorOf<R>` extracts complete failure result branches, **not** bare tags or nested details.
-The helper is exported from both `ezrez` and `ezrez/core` and adds no runtime code.
+`EzFailOf` is exported from both `ezrez` and `ezrez/core` and adds no runtime code.
 
 Failure envelopes intentionally accept no application data and always contain an `ErrorSnapshot`.
 Expected domain failures receive the default snapshot automatically. Data referenced by a native
@@ -169,37 +167,6 @@ snapshot's `context`. Historical reference sources are unchanged.
   accept a generic parameter claiming otherwise. Validate those with your application schema before
   treating a transported result as `EzRez<User, SpecificError>`.
 
-## Optional function normalization
-
-```ts
-import { define, ok, fail } from "ezrez";
-
-const load = define((id: string) => {
-  if (!id) return fail({ tag: "INVALID_ID" });
-  return ok({ id });
-});
-// Public return type: EzRez<{ id: string }, InvalidIdFailure>
-const count = define(() => ok(1)); // () => EzRez<number, never>
-
-const loadAsync = define(async (id: string) => {
-  if (!id) return fail({ tag: "INVALID_ID" });
-  return ok({ id });
-});
-// Public return type: Promise<EzRez<{ id: string }, "INVALID_ID">>
-type LoadedAsync = Awaited<ReturnType<typeof loadAsync>>;
-```
-
-Native TypeScript typically displays `Ok<A> | Ok<B> | Fail<Tag>`. This is already a valid
-result. `define` exposes a simplified `EzRez<A | B, E>` by extracting and combining the callback's
-return branches. Base failures are reduced to their tag strings. `Prettify` and `Simplified` are
-also available as type helpers. The simplification is entirely optional. Editor tooltips may still
-expand aliases. Combining branches may lose
-correlations between individual return branches, so prefer native inference when those matter.
-
-At runtime `define(callback) === callback`: no per-call wrapper, Promise handling, catching or result
-transformation. Optional/rest parameters are preserved. This helper targets ordinary synchronous
-or Promise-returning, non-generic functions. Generic, overloaded and explicit-`this` signatures
-should use native inference or explicit annotations. Non-result callbacks are rejected by its types.
 
 ## Exception snapshots and custom error fields
 
@@ -222,9 +189,20 @@ const result = fail("NETWORK", new HttpError("Unavailable"));
 `fail(tag, nativeError)` always stores a fresh plain `ErrorSnapshot`, so native Errors are normalized
 automatically. Descriptor calls merge defined `name`, `message`, `stack`, `cause`, and `context`
 fields into `{ name: "Error", message: tag, cause: null }`; `undefined` does not erase defaults.
-In descriptor forms, `cause` is the snapshot's nested cause. Use the two-argument native Error form
-when the Error itself should be the primary snapshot. `normalizeCause(unknown)` remains useful to
-explicitly snapshot an exception and creates data compatible with both JSON and `structuredClone`:
+When a descriptor supplies `context`, its type remains coupled to the returned failure tag:
+
+```ts
+const parsedPort = fail("INVALID_PORT", { context: { input: "3000" } });
+if (parsedPort.tag === "INVALID_PORT") {
+  parsedPort.cause.context.input; // string
+}
+```
+
+Correlated failure branches are preserved. If multiple shapes share one tag, the tag
+cannot distinguish them; give the inner context its own discriminant. In descriptor forms, `cause`
+is the snapshot's nested cause. Use the two-argument native Error form when the Error itself should
+be the primary snapshot. `normalizeCause(unknown)` remains useful to explicitly snapshot an exception
+and creates data compatible with both JSON and `structuredClone`:
 
 ```ts
 type ErrorDescriptor = Readonly<{
@@ -242,6 +220,9 @@ type ErrorSnapshot = Readonly<{
   cause: ErrorSnapshot | null;
   context?: Readonly<Record<string, JsonValue>>;
 }>;
+
+type ErrorSnapshotWithContext<C extends Readonly<Record<string, JsonValue>>> =
+  Omit<ErrorSnapshot, "context"> & { context: C };
 ```
 
 - Null/undefined input becomes `null`. Primitive thrown values get a `NonError` name and string
@@ -290,10 +271,10 @@ success payloads; `normalizeCause` normalizes exception snapshots.
 
 ## Incremental scope
 
-This first implementation includes `ok`, `fail`, the three guards, result/extraction types,
-`define`, and `normalizeCause`. Failure factories, recovery chains, exception-catching adapters,
-and other convenience utilities are deferred. The old implementation remains reference material
-only; its names/signatures are not a compatibility contract.
+This first implementation includes `ok`, `fail`, the three guards, result/extraction types, and
+`normalizeCause`. Failure factories, recovery chains, exception-catching adapters, and other
+convenience utilities are deferred. The old implementation remains reference material only; its
+names/signatures are not a compatibility contract.
 
 ## Development
 

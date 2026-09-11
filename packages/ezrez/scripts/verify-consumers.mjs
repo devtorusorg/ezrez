@@ -45,7 +45,7 @@ try {
       const result = core.fail("IO", new Error("disk"));
       if (!ez.isError(result) || !ez.isEzRez(result) || result.tag !== "IO" || result.cause.message !== "disk") throw Error("invalid result");
       if (ez.isEzRez({ isSuccess: false, failure: { type: "LEGACY", message: "", cause: null } })) throw Error("legacy result accepted");
-      if (!core.isSuccess(ez.ok(1)) || utils.define(() => ez.ok(2))().value !== 2) throw Error("invalid helper");
+      if (!core.isSuccess(ez.ok(1)) || ez.ok(2).value !== 2) throw Error("invalid helper");
       if ("normalizeCause" in core || "ok" in utils) throw Error("invalid entry boundary");
     `,
       ],
@@ -56,10 +56,10 @@ try {
   const types = `
     import * as ez from "ezrez";
     import { ok, fail, isError, type EzRez, type EzFailOf, type ErrorOf } from "ezrez/core";
-    import { define, normalizeCause } from "ezrez/utils";
+    import { normalizeCause } from "ezrez/utils";
     const fn = (flag: boolean) => flag ? ok(1) : fail("IO", new Error());
     type E = ErrorOf<ReturnType<typeof fn>>;
-    const normalized: (flag: boolean) => EzRez<number, "IO"> = define(fn);
+    const normalized: (flag: boolean) => EzRez<number, "IO"> = fn;
     const result = normalized(false);
     if (isError(result)) { const tag: "IO" = result.tag; void tag; }
     const onlyOk: EzRez<number, never> = ez.ok(1);
@@ -77,7 +77,7 @@ try {
     const divide = (a: number, b: number) => b === 0
       ? fail("DIVIDE_BY_ZERO")
       : a > 100 ? fail("TOO_BIG_NUMBER") : ok(a / b);
-    const byHelper: (a: number, b: number) => ez.EzRez<number, ez.EzFailOf<MathTag>> = define(divide);
+    const byHelper: (a: number, b: number) => ez.EzRez<number, ez.EzFailOf<MathTag>> = divide;
     const exactTag: Extract<MathFailure, { tag: "DIVIDE_BY_ZERO" }> = {
       tag: "DIVIDE_BY_ZERO",
       cause: { name: "Error", message: "DIVIDE_BY_ZERO", cause: null },

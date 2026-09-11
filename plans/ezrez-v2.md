@@ -17,10 +17,10 @@ The package already has `sideEffects: false`, ESM/CJS declaration-aware exports,
 
 - Prefer compatibility with both JSON and structured clone: use a plain error snapshot, not a native Error instance. Success values remain unrestricted, so whole-result serializability is conditional on the payload; do not claim universal round-trip guarantees.
 - Freely redesign names/signatures and implement incrementally; reference code captures intent, not a compatibility obligation.
-- Proposed exports: `ezrez/core` for minimal primitives, `ezrez/utils` for helpers, and `ezrez` as a named-export barrel of both. No runtime namespace object; verify static namespace member access tree-shakes.
-- Native inference is first-class; include optional synchronous `define` in utils to normalize a callback's public return signature. No wrapper is required for constructors, narrowing or extraction.
+- Native inference is first-class; no wrapper is required for constructors, narrowing or extraction.
 - Always include `cause` on produced failures; use `null` when absent.
-- Initial increment: constructors, guards, type extraction, cause normalization and `define`. Defer factories, recovery chains, exception-catching adapters, async wrappers and other helpers.
+- Initial increment: constructors, guards, type extraction and cause normalization. Defer factories,
+  recovery chains, exception-catching adapters, async wrappers and other helpers.
 
 ### Core API and types
 
@@ -30,13 +30,13 @@ Preserve the useful reference wire shape, without preserving old function names:
 type JsonValue = string | number | boolean | null
   | readonly JsonValue[]
   | { readonly [key: string]: JsonValue };
-type ErrorSnapshot = Readonly<{
-  name: string;
-  message: string;
-  stack?: string;
-  cause: ErrorSnapshot | null;
-  context?: Readonly<Record<string, JsonValue>>;
-}>;
+interface ErrorSnapshot {
+  readonly name: string;
+  readonly message: string;
+  readonly stack?: string;
+  readonly cause: ErrorSnapshot | null;
+  readonly context?: Readonly<Record<string, JsonValue>>;
+}
 type ErrorDescriptor = Readonly<{
   name?: string;
   message?: string;
@@ -47,12 +47,16 @@ type ErrorDescriptor = Readonly<{
 type Failure = Readonly<{
   cause: ErrorSnapshot;
 }>;
-type Ok<S> = Readonly<{ tag: "success"; value: S; cause?: never }>;
-type Fail<Tag extends string> = Readonly<{
-  tag: Tag;
-  cause: ErrorSnapshot;
-  value?: never;
-}>;
+interface Ok<S> {
+  readonly tag: "success";
+  readonly value: S;
+  readonly cause?: never;
+}
+interface Fail<Tag extends string, Cause extends ErrorSnapshot = ErrorSnapshot> {
+  readonly tag: Tag;
+  readonly cause: Cause;
+  readonly value?: never;
+}
 type EzRez<S, E extends string | Fail<string> = never> =
   | ([S] extends [never] ? never : Ok<S>)
   | ([E] extends [never] ? never : ResolveFailure<E>);
@@ -73,9 +77,8 @@ type EzRez<S, E extends string | Fail<string> = never> =
 - Recursively preserve JSON-safe custom primitives, arrays and object data fields. Normalize nested Errors to snapshots and Dates to ISO strings (invalid Dates get a marker). Use documented tagged plain-object markers such as `{ $ezrez: 'circular' }` for cycles, depth exhaustion, unreadable/accessor properties and unsupported values. These markers are informational, not a reversible codec.
 - Use guarded property-descriptor inspection; do not invoke custom-field getters. Guard standard error property reads and proxy reflection failures. Use path-based cycle detection and a depth limit of 16 across causes and context. Safely define keys including `__proto__` without prototype mutation.
 - Validate optional snapshot context as finite, acyclic JSON data without claiming to recover the original custom Error class/type. Document that snapshots preserve custom data, not prototypes or behavior.
-- `fail(tag, nativeError)` normalizes native Errors through the core normalization implementation. The public `normalizeCause` utility remains available for callers that need an explicit snapshot.
-- `define(callback)` infers its parameter tuple and branch return union `R`, exposing `(...args: Args) => Normalize<R>`. Return the same callback at runtime; do not catch exceptions or transform values. Localize and justify any implementation-only type assertion.
-- Support ordinary synchronous, non-generic callbacks, including optional/rest parameters. Reject non-result and Promise-returning callbacks. Overload/generic/explicit-this preservation is not promised; those functions should use native inference or an explicit return annotation. Any lost branch correlation and editor alias-display limitations must be documented.
+- `fail(tag, nativeError)` normalizes native Errors through the core normalization implementation.
+  The public `normalizeCause` utility remains available for callers that need an explicit snapshot.
 
 ### Usage target
 
@@ -88,10 +91,6 @@ function load(id: string) {
 }
 // Native: Ok<{ id: string }> | Fail<'INVALID_ID'>
 // ErrorOf<ReturnType<typeof load>> retains 'INVALID_ID'.
-const normalizedLoad = ez.define(load);
-// Public return signature: EzRez<{ id: string }, 'INVALID_ID'>
-const count = ez.define(() => ez.ok(1));
-// Public return signature: EzRez<number, never>
 ```
 
 ### Packaging
@@ -105,7 +104,7 @@ const count = ez.define(() => ez.ok(1));
 
 - `packages/ezrez/src/index.ts`, `src/index.test.ts`: public barrel and updated export smoke tests.
 - New `packages/ezrez/src/core/{index,types,constructors,guards}.ts` and adjacent runtime/type tests.
-- New `packages/ezrez/src/utils/{index,normalize-cause,define}.ts` and adjacent tests.
+- New `packages/ezrez/src/utils/{index,normalize-cause}.ts` and adjacent tests.
 - `packages/ezrez/{package.json,deno.json,tsup.config.ts,tsconfig.json,vitest.config.ts}`: exports, build entries, verification scripts and reference exclusions.
 - `packages/ezrez/scripts/verify-consumers.mjs`; new `scripts/verify-tree-shaking.mjs` and small consumer fixtures as needed.
 - `packages/ezrez/README.md`: API, serialization contract and incremental scope.
@@ -122,20 +121,19 @@ const count = ez.define(() => ez.ok(1));
 ## Steps
 
 - [x] Agree on serialization, native inference plus optional wrapping, free redesign, null causes and incremental scope.
-- [x] Establish test/typecheck boundaries and prototype result types, constructor inference, predicates and `define` with compile-time fixtures. Typecheck and initial tests pass on TypeScript 5.9; also exclude reference sources from Biome.
+- [x] Establish test/typecheck boundaries and prototype result types, constructor inference and predicates with compile-time fixtures. Typecheck and initial tests pass on TypeScript 5.9; also exclude reference sources from Biome.
 - [x] Implement core constructors and guards with data-only results and no utility dependency. Core runtime and inference tests pass.
-- [x] Implement defensive cause normalization and the identity `define` helper. 15 tests pass, covering custom fields, JSON/clone transport, hostile objects, cycles and depth limits.
+- [x] Implement defensive cause normalization. Tests cover custom fields, JSON/clone transport, hostile objects, cycles and depth limits.
 - [x] Wire the three npm/JSR entry points and update export smoke/consumer tests. Actual npm tarball ESM/CJS runtime and declaration consumers pass; JSR dry run resolves the full source graph with existing `.js` specifiers and excludes tests/reference files.
 - [x] Add runtime, inference, serialization and tree-shaking regression coverage. Package check passes (18 tests plus tsc assertions). Bun browser ESM checks measure constructor-only root/core imports at 140 bytes named / 160 bytes namespace; used normalization is 3,920 bytes. CI runs the new tree-shaking check without added dependencies.
 - [x] Document native-first usage, optional normalization, serialization limitations, cause-stack/custom-field sensitivity, custom-field preservation and normalization limits, and deferred features. See `packages/ezrez/README.md`.
 
 ## Verification
 
-- Compile-time tests, actually checked by `tsc` (not only Vitest transpilation): multiple success/failure branches, exact failure envelopes, default/error `never`, failure-only/both-never cases, assignment to explicit `EzRez<S,E>`, constructor literal inference, guard narrowing, native async functions via `Awaited<ReturnType<...>>`, and no-error extraction. Use positive assertions and `@ts-expect-error` negative cases.
-- `define` tests: identical callback reference, inferred argument tuples, success-only/failure-only/mixed normalized signatures, optional/rest arguments, and rejection of non-results/async callbacks. Confirm exceptions propagate unchanged.
+- Compile-time tests, actually checked by `tsc` (not only Vitest transpilation): multiple success/failure branches, exact failure envelopes, default/error `never`, failure-only/both-never cases, assignment to explicit `EzRez<S,E>`, constructor literal inference, guard narrowing, native async functions via `Awaited<ReturnType<...>>`, correlated descriptor context and no-error extraction. Use positive assertions and `@ts-expect-error` negative cases.
 - Runtime tests: constructor shapes, absent cause becoming null, rejection of extra envelope fields, valid/malformed envelopes and snapshots, branch conflicts, primitives and hostile objects. Cause tests cover native/cross-realm Errors, nested causes, existing snapshots without context re-nesting, non-Error throws, cycles, depth limits, throwing getters, and Error-owned custom context.
 - For supported payload fixtures, assert equality after both `JSON.parse(JSON.stringify(result))` and `structuredClone(result)`, including failure causes and guard acceptance after transport. Explicitly test/document unsupported unrestricted success payloads and lossy error normalization.
-- Bundle ESM consumers using both named imports and static namespace access from root and core. Assert unused normalization/define code is absent; verify a used utility remains. Include a small bundle-size regression ceiling calibrated to the first implementation. Do not promise CJS or dynamic-namespace tree shaking.
+- Bundle ESM consumers using both named imports and static namespace access from root and core. Assert unused normalization code is absent; verify a used utility remains. Include a small bundle-size regression ceiling calibrated to the first implementation. Do not promise CJS or dynamic-namespace tree shaking.
 - Extend consumer verification beyond import-only checks: execute constructors/guards from all three ESM/CJS entry points and compile `.mts`/`.cts` type fixtures against built declarations. Check packed contents/exports and JSR source graph, excluding tests/reference files.
 - From `packages/ezrez`, run `bun run check`, `bun run test:consumers`, the new tree-shaking script, `bun run pack:check`, and `bun run jsr:check`; run monorepo build/check for integration.
 

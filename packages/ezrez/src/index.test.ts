@@ -6,9 +6,8 @@ import * as utils from "./utils/index.js";
 describe("public API", () => {
   it("re-exports named functions without a runtime API object", () => {
     expect(Object.keys(core).sort()).toEqual(["fail", "isError", "isEzRez", "isSuccess", "ok"]);
-    expect(Object.keys(utils).sort()).toEqual(["define", "normalizeCause"]);
+    expect(Object.keys(utils).sort()).toEqual(["normalizeCause"]);
     expect(Object.keys(api).sort()).toEqual([...Object.keys(core), ...Object.keys(utils)].sort());
     expect(api.ok).toBe(core.ok);
-    expect(api.define).toBe(utils.define);
   });
 });

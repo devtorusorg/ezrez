@@ -3,7 +3,6 @@
  * Excluded from normal typecheck/build/lint; no @ts-expect-error suppressions here.
  */
 import {
-  define,
   fail,
   isError,
   isEzRez,
@@ -70,7 +69,7 @@ const defaultedDescriptor = fail("DEFAULTED_DESCRIPTOR", {
 });
 defaultedDescriptor.cause.message; // "DEFAULTED_DESCRIPTOR"
 
-// Native inference preserves every result branch without define.
+// Native inference preserves every result branch directly.
 function divide(a: number, b: number) {
   if (b === 0) return fail("DIVIDE_BY_ZERO");
   return ok(a / b);
@@ -84,18 +83,21 @@ if (isSuccess(division)) {
   division.cause; // ErrorSnapshot
 }
 
-// define keeps the callback unchanged and presents a normalized EzRez return type.
-const parsePort = define((input: string) => {
+// Native inference preserves the exact correlated result union without a wrapper.
+const parsePort = (input: string) => {
   const port = Number(input);
   if (!Number.isInteger(port)) {
     return fail("INVALID_PORT", { message: `Invalid port: ${input}`, context: { input } });
   }
   return ok(port);
-});
+};
 
 const parsedPort = parsePort("3000");
 if (isError(parsedPort)) {
   parsedPort.cause; // ErrorSnapshot
+  if (parsedPort.tag === "INVALID_PORT") {
+    parsedPort.cause.context.input; // string: tag and context stay correlated
+  }
 }
 
 // Explicit annotations are useful when the public failure contract is fixed in advance.
@@ -107,11 +109,11 @@ function findUser(userId: string): EzRez<{ id: string; name: string }, MissingUs
   return ok({ id: userId, name: "Ada" });
 }
 
-// Async define preserves parameters and returns Promise<EzRez<...>>.
-const findUserAsync = define(async (userId: string) => {
+// Native async inference preserves Promise<EzRez<...>>.
+const findUserAsync = async (userId: string) => {
   if (!userId) return fail("INVALID_USER_ID");
   return ok({ id: userId, name: "Ada" });
-});
+};
 type AsyncUserResult = Awaited<ReturnType<typeof findUserAsync>>;
 type AsyncUser = SuccessOf<AsyncUserResult>;
 type AsyncUserFailure = ErrorOf<AsyncUserResult>;
@@ -121,6 +123,7 @@ const transported: unknown = { tag: "success", value: 42 };
 if (isEzRez(transported) && isSuccess(transported)) {
   transported.value; // unknown: isEzRez validates the envelope, not application data
 }
+
 
 // Intentional errors: hover each expression to inspect the expected diagnostic.
 const cannotFail: EzRez<number> = fail("NOPE");
@@ -139,10 +142,6 @@ const malformedTransportedFailure: unknown = {
   cause: null,
 };
 const rejectedTransportedFailure = isEzRez(malformedTransportedFailure); // false
-const notAResult = define(() => 1);
-const mixedReturn = define((valid: boolean) => (valid ? ok(1) : undefined));
-const asyncNotAResult = define(async () => 1);
-division.value;
 
 void cachedCount;
 void defaultFailure;
@@ -166,6 +165,3 @@ void invalidDescriptorContext;
 void legacyDiscriminator;
 void legacyNestedFailure;
 void rejectedTransportedFailure;
-void notAResult;
-void mixedReturn;
-void asyncNotAResult;
