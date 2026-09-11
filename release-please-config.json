@@ -1,0 +1,15 @@
+{
+  "packages": {
+    "packages/ezrez": {
+      "release-type": "node",
+      "package-name": "ezrez",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "packages/ezrez/deno.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    }
+  }
+}

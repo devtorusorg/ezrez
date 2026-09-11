@@ -1,0 +1,81 @@
+{
+  "name": "ezrez",
+  "version": "0.1.0",
+  "description": "A runtime-agnostic TypeScript library for browser and Node.js projects.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "typescript",
+    "javascript",
+    "browser",
+    "nodejs",
+    "esm",
+    "commonjs"
+  ],
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./core": {
+      "import": {
+        "types": "./dist/core/index.d.ts",
+        "default": "./dist/core/index.js"
+      },
+      "require": {
+        "types": "./dist/core/index.d.cts",
+        "default": "./dist/core/index.cjs"
+      }
+    },
+    "./utils": {
+      "import": {
+        "types": "./dist/utils/index.d.ts",
+        "default": "./dist/utils/index.js"
+      },
+      "require": {
+        "types": "./dist/utils/index.d.cts",
+        "default": "./dist/utils/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "check": "bun run format:check && bun run lint && bun run typecheck && bun run test",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "pack:check": "npm pack --dry-run",
+    "test:consumers": "bun run build && node scripts/verify-consumers.mjs",
+    "test:tree-shaking": "bun run build && bun scripts/verify-tree-shaking.mjs",
+    "jsr:check": "bunx jsr publish --dry-run --allow-dirty"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.13",
+    "jsr": "^0.14.3",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "ezrez-monorepo",
+  "private": true,
+  "packageManager": "bun@1.4.2",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "build": "bun run --filter '*' build",
+    "check": "bun run --filter '*' check",
+    "format": "bun run --filter ezrez format",
+    "format:check": "bun run --filter ezrez format:check",
+    "lint": "bun run --filter ezrez lint",
+    "docs:dev": "bun run --filter @devtorus/ezrez-docs dev"
+  }
+}
