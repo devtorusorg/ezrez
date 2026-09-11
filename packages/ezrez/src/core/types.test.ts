@@ -22,12 +22,12 @@ function fixtures() {
   const native = (mode: number) => {
     if (mode === 0) return prototypeOk(1);
     if (mode === 1) return prototypeOk("value");
-    if (mode === 2) return prototypeFail({ type: "MISSING", message: "Missing", id: 1 });
-    return prototypeFail({ type: "INVALID", message: "Invalid", reason: "bad" });
+    if (mode === 2) return prototypeFail({ tag: "MISSING", message: "Missing", id: 1 });
+    return prototypeFail({ tag: "INVALID", message: "Invalid", reason: "bad" });
   };
   type R = ReturnType<typeof native>;
   expectTypeOf<SuccessOf<R>>().toEqualTypeOf<number | string>();
-  expectTypeOf<ErrorOf<R>["type"]>().toEqualTypeOf<"MISSING" | "INVALID">();
+  expectTypeOf<ErrorOf<R>["tag"]>().toEqualTypeOf<"MISSING" | "INVALID">();
   expectTypeOf<R>().toExtend<EzRez<number | string, ErrorOf<R>>>();
   const normalized = prototypeDefine(native);
   expectTypeOf(normalized).returns.toEqualTypeOf<EzRez<number | string, ErrorOf<R>>>();
@@ -43,7 +43,7 @@ it("models impossible branches and distributes extraction", () => {
   expectTypeOf<EzRez<number>>().toEqualTypeOf<Ok<number>>();
   expectTypeOf<ErrorOf<EzRez<number>>>().toEqualTypeOf<never>();
   expectTypeOf<EzRez<never, never>>().toEqualTypeOf<never>();
-  type E = { type: "ERROR"; message: string; cause: null };
+  type E = { tag: "ERROR"; message: string; cause: null };
   expectTypeOf<EzRez<never, E>>().toEqualTypeOf<Fail<E>>();
   expectTypeOf<SuccessOf<Fail<E>>>().toEqualTypeOf<never>();
 });

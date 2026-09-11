@@ -4,7 +4,7 @@ import { fail, isEzRez } from "../core/index.js";
 import { normalizeCause } from "./normalize-cause.js";
 
 function roundTrip(error: unknown) {
-  const result = fail({ type: "TEST", message: "Test", cause: normalizeCause(error) });
+  const result = fail({ tag: "TEST", message: "Test", cause: normalizeCause(error) });
   expect(JSON.parse(JSON.stringify(result))).toEqual(result);
   expect(structuredClone(result)).toEqual(result);
   expect(isEzRez(result)).toBe(true);

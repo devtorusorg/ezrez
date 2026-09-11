@@ -55,14 +55,14 @@ import type { EzRez, ErrorOf, SuccessOf } from "ezrez";
 
 function loadUser(id: string) {
   if (!id) {
-    return ez.fail({ type: "INVALID_ID", message: "ID is required" });
+    return ez.fail({ tag: "INVALID_ID", message: "ID is required" });
   }
   return ez.ok({ id });
 }
 
 const result = loadUser("123");
 if (ez.isError(result)) {
-  result.failure.type;  // "INVALID_ID", not string
+  result.failure.tag;  // "INVALID_ID", not string
   result.failure.cause; // null
 } else {
   result.value.id;      // string
@@ -82,10 +82,12 @@ function count(): EzRez<number> { // Error parameter defaults to never
 ```ts
 { isSuccess: true, value: S }
 // or
-{ isSuccess: false, failure: E }
+{ isSuccess: false, failure: FailurePayload } // Resolved from E
 ```
 
-`E` must extend `{ type: string; message: string; cause: ErrorSnapshot | null }`.
+`E` accepts string tags, complete failure objects, or a mix of both. Tags expand to failure
+payloads with `{ tag; message; cause }`; complete objects must extend
+`{ tag: string; message: string; cause: ErrorSnapshot | null }`.
 Add your own fields, including `data`, and combine complete failure types in an error union.
 Constructors preserve custom fields and failure-tag literals. They return only their own branch;
 `ok` does not introduce a possible failure. Ordinary success payloads are not inferred deeply readonly.
@@ -99,6 +101,58 @@ Readonly types describe the envelope; constructors do not freeze, deep-clone or 
 `fail` shallow-copies the failure input and defaults an omitted/undefined cause to `null`.
 Use `as const` or explicit types for tags in previously declared variables if they have already
 widened to `string`; constructors cannot recover lost literals.
+
+### Shorthand error types
+
+```ts
+import { define, fail, ok, type EzFailOf, type EzRez } from "ezrez";
+
+type DivideByZeroFailure = EzFailOf<"DIVIDE_BY_ZERO">;
+// Readonly<{ tag: "DIVIDE_BY_ZERO"; message: string; cause: ErrorSnapshot | null }>
+
+type MathFailure = EzFailOf<"DIVIDE_BY_ZERO" | "TOO_BIG_NUMBER" | "SOMETHING_ELSE">;
+// A union of separate failure payloads, not result envelopes.
+
+function divide(a: number, b: number): EzRez<number, "DIVIDE_BY_ZERO" | "TOO_BIG_NUMBER"> {
+  if (b === 0) return fail({ tag: "DIVIDE_BY_ZERO", message: "Cannot divide by zero" });
+  if (a > 100) return fail({ tag: "TOO_BIG_NUMBER", message: "Number exceeds 100" });
+  return ok(a / b);
+}
+
+// Optional return-type normalization; native inference is also supported directly.
+const easytype = define(divide);
+type ResultByTags = EzRez<number, "DIVIDE_BY_ZERO" | "TOO_BIG_NUMBER">;
+type ResultByHelper = EzRez<number, EzFailOf<"DIVIDE_BY_ZERO" | "TOO_BIG_NUMBER">>;
+// ResultByTags and ResultByHelper are equivalent.
+
+type OnlyZero = Extract<MathFailure, { tag: "DIVIDE_BY_ZERO" }>;
+```
+
+`EzFailOf` distributes over string unions, so extraction and narrowing work per tag.
+`EzFailOf<never>` is `never`; the error parameter of `EzRez` still defaults to `never`.
+`ErrorOf<R>` always extracts complete failure objects, **not** tag strings. The helper is
+exported from both `ezrez` and `ezrez/core` and adds no runtime code.
+
+For custom fields, mix a complete failure type with simple tags:
+
+```ts
+type TooBigFailure = EzFailOf<"TOO_BIG_NUMBER"> & { limit: number };
+type Calculation = EzRez<number, "DIVIDE_BY_ZERO" | TooBigFailure>;
+```
+
+The `TOO_BIG_NUMBER` variant now requires `limit`; narrowing on `failure.tag` exposes it.
+Tag-only annotations expose only the base fields, even if an implementation returns extra data.
+Use native inference or complete failure types to retain those fields. Use each tag only once
+in a mixed union: including both `"TOO_BIG_NUMBER"` and `TooBigFailure` would also allow the
+base-only variant, defeating the required `limit` contract.
+
+### Breaking change: `type` → `tag`
+
+Use `fail({ tag: "ERROR", message: "..." })`, inspect `result.failure.tag`, and update stored or
+transported failures to use `tag`. Legacy type-only constructor inputs and wire payloads are no
+longer accepted; there is no automatic migration or alias. A valid failure may still carry an
+unrelated custom `type` field alongside its required `tag`. Native Error custom fields are
+preserved without renaming. Historical reference sources are unchanged.
 
 ### Guards
 
@@ -116,7 +170,7 @@ widened to `string`; constructors cannot recover lost literals.
 import { define, ok, fail } from "ezrez";
 
 const load = define((id: string) => {
-  if (!id) return fail({ type: "INVALID_ID", message: "ID required" });
+  if (!id) return fail({ tag: "INVALID_ID", message: "ID required" });
   return ok({ id });
 });
 // Public return type: EzRez<{ id: string }, InvalidIdFailure>
@@ -124,8 +178,10 @@ const count = define(() => ok(1)); // () => EzRez<number, never>
 ```
 
 Native TypeScript typically displays `Ok<A> | Ok<B> | Fail<E>`. This is already a valid result.
-`define` exposes `EzRez<A | B, E>` by extracting and combining the callback's return branches;
-it is entirely optional. Editor tooltips may still expand aliases. Combining branches may lose
+`define` exposes a simplified `EzRez<A | B, E>` by extracting and combining the callback's return
+branches. Base failures are reduced to their tag strings, while failures with custom fields retain
+those fields. `Prettify` and `Simplified` are also available as type helpers. The simplification is
+entirely optional. Editor tooltips may still expand aliases. Combining branches may lose
 correlations between individual return branches, so prefer native inference when those matter.
 
 At runtime `define(callback) === callback`: no per-call wrapper, catching, Promise handling or result
@@ -144,7 +200,7 @@ class HttpError extends Error {
 }
 
 const result = fail({
-  type: "NETWORK",
+  tag: "NETWORK",
   message: "Could not load user",
   cause: normalizeCause(new HttpError("Unavailable")),
 });
@@ -155,8 +211,10 @@ const result = fail({
 // }
 ```
 
-`fail` accepts a plain `ErrorSnapshot | null`, **not** a native Error. `normalizeCause(unknown)`
-creates a fresh snapshot compatible with both JSON and `structuredClone`:
+`fail` accepts `ErrorSnapshot | Error | null` and always stores a fresh plain
+`ErrorSnapshot | null`, so native Errors are normalized automatically. `normalizeCause(unknown)`
+remains useful to explicitly snapshot an exception before constructing a failure, and creates data
+compatible with both JSON and `structuredClone`:
 
 ```ts
 type ErrorSnapshot = Readonly<{
@@ -242,7 +300,7 @@ explicit `.js` relative specifiers (verified by the JSR dry run).
 `check` runs formatting, linting, `tsc` (including compile-time test assertions), and Vitest.
 Consumer checks pack the package and exercise all three ESM/CJS entry points and declarations.
 Tree-shaking checks use Bun's browser ESM bundler, with named and static namespace imports and a
-512-byte constructor-only regression ceiling; Bun is already the project's package manager.
+512-byte `ok`-only regression ceiling; Bun is already the project's package manager.
 
 ### IDE error playground
 

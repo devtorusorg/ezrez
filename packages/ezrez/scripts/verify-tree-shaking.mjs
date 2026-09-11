@@ -27,8 +27,8 @@ try {
     for (const style of ["named", "namespace"]) {
       const source =
         style === "named"
-          ? `import { ok, fail } from "${entry}"; export { ok, fail };`
-          : `import * as ez from "${entry}"; export const success = ez.ok; export const failure = ez.fail;`;
+          ? `import { ok } from "${entry}"; export { ok };`
+          : `import * as ez from "${entry}"; export const success = ez.ok;`;
       const output = await bundle(`${entry.replaceAll("/", "-")}-${style}`, source);
       assert(!output.includes("NormalizationError"), "unused cause normalization retained");
       assert(!output.includes("getOwnPropertyDescriptor"), "unused validation retained");
@@ -36,12 +36,12 @@ try {
         !output.includes("normalizeCause") && !output.includes("define"),
         "unused helpers retained",
       );
-      // Baseline ~150 bytes; allow modest changes without accepting accidental helper inclusion.
+      // Baseline ~100 bytes; allow modest changes without accepting accidental helper inclusion.
       assert(
         Buffer.byteLength(output) < 512,
-        `constructor-only bundle grew to ${Buffer.byteLength(output)} bytes`,
+        `ok-only bundle grew to ${Buffer.byteLength(output)} bytes`,
       );
-      console.log(`${entry} (${style}): ${Buffer.byteLength(output)} bytes`);
+      console.log(`${entry} (${style}, ok only): ${Buffer.byteLength(output)} bytes`);
     }
   }
   for (const entry of ["ezrez", "ezrez/utils"]) {

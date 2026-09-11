@@ -5,19 +5,26 @@ import type { ErrorOf, EzRez, SuccessOf } from "./index.js";
 const load = (mode: number) => {
   if (mode === 0) return ok({ id: "user" });
   if (mode === 1) return ok(123);
-  if (mode === 2) return fail({ type: "MISSING", message: "Missing", id: "user" });
-  return fail({ type: "INVALID", message: "Invalid", reason: 1 });
+  if (mode === 2) return fail({ tag: "MISSING", message: "Missing", id: "user" });
+  return fail({ tag: "INVALID", message: "Invalid", reason: 1 });
 };
 
 describe("core", () => {
   it("creates plain branch-only results and fills missing causes", () => {
     expect(ok(undefined)).toEqual({ isSuccess: true, value: undefined });
-    const input = { type: "ERROR", message: "Oops", extra: { value: 1 } };
+    const input = { tag: "ERROR", message: "Oops", extra: { value: 1 } };
     const result = fail(input);
     expect(result).toEqual({ isSuccess: false, failure: { ...input, cause: null } });
     expect(result.failure).not.toBe(input);
     expect(result.failure.extra).toBe(input.extra);
-    expect(fail({ type: "E", message: "", cause: undefined }).failure.cause).toBeNull();
+    expect(fail({ tag: "E", message: "", cause: undefined }).failure.cause).toBeNull();
+    const native = new TypeError("native");
+    const nativeFailure = fail({ tag: "E", message: "", cause: native });
+    expect(nativeFailure.failure.cause).toMatchObject({ name: "TypeError", message: "native" });
+    expect(nativeFailure.failure.cause).not.toBe(native);
+    expectTypeOf(nativeFailure.failure.cause).toEqualTypeOf<
+      import("./types.js").ErrorSnapshot | null
+    >();
     expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
     expect(Object.isFrozen(result)).toBe(false);
   });
@@ -25,20 +32,19 @@ describe("core", () => {
   it("infers payloads, tags, never errors and exact narrowed branches", () => {
     type R = ReturnType<typeof load>;
     expectTypeOf<SuccessOf<R>>().toEqualTypeOf<{ id: string } | number>();
-    expectTypeOf<ErrorOf<R>["type"]>().toEqualTypeOf<"MISSING" | "INVALID">();
+    expectTypeOf<ErrorOf<R>["tag"]>().toEqualTypeOf<"MISSING" | "INVALID">();
     const result: EzRez<SuccessOf<R>, ErrorOf<R>> = load(2);
     expect(isEzRez(result)).toBe(true);
     const branch = load(2);
     if (isError(branch)) {
       expectTypeOf(branch).toEqualTypeOf<Extract<R, { isSuccess: false }>>();
-      if (branch.failure.type === "MISSING")
-        expectTypeOf(branch.failure.id).toEqualTypeOf<"user">();
+      if (branch.failure.tag === "MISSING") expectTypeOf(branch.failure.id).toEqualTypeOf<"user">();
     }
     if (isSuccess(branch)) expectTypeOf(branch.value).toEqualTypeOf<{ id: string } | number>();
     const success = ok({ count: 1 });
     success.value.count = 2; // Success payloads are not inferred deeply readonly.
     expectTypeOf<ErrorOf<typeof success>>().toEqualTypeOf<never>();
-    const failure = fail({ type: "E", message: "" });
+    const failure = fail({ tag: "E", message: "" });
     expectTypeOf<SuccessOf<typeof failure>>().toEqualTypeOf<never>();
     const nativeAsync = async () => ok(1);
     expectTypeOf<ErrorOf<Awaited<ReturnType<typeof nativeAsync>>>>().toEqualTypeOf<never>();
@@ -46,15 +52,15 @@ describe("core", () => {
 
   it("preserves annotated custom failure unions", () => {
     type E =
-      | { type: "A"; message: string; cause: null; a: number }
-      | { type: "B"; message: string; cause: null; b: string };
+      | { tag: "A"; message: string; cause: null; a: number }
+      | { tag: "B"; message: string; cause: null; b: string };
     const fromUnion = (error: E) => fail(error);
     expectTypeOf<ErrorOf<ReturnType<typeof fromUnion>>>().toExtend<E>();
-    expectTypeOf(fail({ type: "X", message: "" }).failure.cause).toEqualTypeOf<null>();
+    expect(fail({ tag: "X", message: "" }).failure.cause).toBeNull();
   });
 
   it("validates structural boundaries without invoking getters", () => {
-    for (const value of [ok(1), ok(() => 1), fail({ type: "E", message: "" })])
+    for (const value of [ok(1), ok(() => 1), fail({ tag: "E", message: "" })])
       expect(isEzRez(value)).toBe(true);
     const invalid: unknown[] = [
       null,
@@ -63,9 +69,9 @@ describe("core", () => {
       {},
       { isSuccess: true },
       { isSuccess: true, value: 1, failure: undefined },
-      { isSuccess: false, failure: { type: "E", message: "" } },
-      { isSuccess: false, failure: { type: 1, message: "", cause: null } },
-      { isSuccess: false, value: undefined, failure: { type: "E", message: "", cause: null } },
+      { isSuccess: false, failure: { tag: "E", message: "" } },
+      { isSuccess: false, failure: { tag: 1, message: "", cause: null } },
+      { isSuccess: false, value: undefined, failure: { tag: "E", message: "", cause: null } },
       {
         get isSuccess() {
           throw new Error("getter");
@@ -85,7 +91,7 @@ describe("core", () => {
 
   it("rejects malformed or cyclic snapshots and non-JSON details", () => {
     const validate = (cause: unknown) =>
-      isEzRez({ isSuccess: false, failure: { type: "E", message: "", cause } });
+      isEzRez({ isSuccess: false, failure: { tag: "E", message: "", cause } });
     expect(validate({ name: "Error", message: "", cause: null, details: { a: [1, null] } })).toBe(
       true,
     );

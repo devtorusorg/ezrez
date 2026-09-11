@@ -4,6 +4,7 @@ export type {
   AnyResult,
   ErrorOf,
   ErrorSnapshot,
+  EzFailOf,
   EzRez,
   Fail,
   Failure,
@@ -11,6 +12,8 @@ export type {
   JsonValue,
   Normalize,
   Ok,
+  Prettify,
+  Simplified,
   SuccessOf,
   WithCause,
 } from "./types.js";

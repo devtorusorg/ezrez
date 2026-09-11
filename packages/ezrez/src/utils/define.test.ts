@@ -1,11 +1,11 @@
 import { expect, expectTypeOf, it } from "vitest";
 import { fail, ok } from "../core/index.js";
-import type { ErrorOf, EzRez } from "../core/types.js";
+import type { EzRez } from "../core/types.js";
 import { define } from "./define.js";
 
 it("returns the callback unchanged and normalizes its public signature", () => {
   const callback = (id: string, count = 1, ...flags: boolean[]) => {
-    if (!id) return fail({ type: "INVALID", message: "ID required" });
+    if (!id) return fail({ tag: "INVALID", message: "ID required" });
     return ok({ id, count, flags });
   };
   const fn = define(callback);
@@ -13,13 +13,11 @@ it("returns the callback unchanged and normalizes its public signature", () => {
   expect(fn("id")).toEqual(ok({ id: "id", count: 1, flags: [] }));
   expectTypeOf(fn).parameters.toEqualTypeOf<[id: string, count?: number, ...flags: boolean[]]>();
   expectTypeOf(fn).returns.toEqualTypeOf<
-    EzRez<{ id: string; count: number; flags: boolean[] }, ErrorOf<ReturnType<typeof callback>>>
+    EzRez<{ id: string; count: number; flags: boolean[] }, "INVALID">
   >();
   expectTypeOf(define(() => ok(1))).returns.toEqualTypeOf<EzRez<number>>();
-  const onlyFailure = () => fail({ type: "E", message: "" });
-  expectTypeOf(define(onlyFailure)).returns.toEqualTypeOf<
-    EzRez<never, ErrorOf<ReturnType<typeof onlyFailure>>>
-  >();
+  const onlyFailure = () => fail({ tag: "E", message: "" });
+  expectTypeOf(define(onlyFailure)).returns.toEqualTypeOf<EzRez<never, "E">>();
 });
 
 it("does not catch or transform exceptions", () => {

@@ -94,7 +94,7 @@ export function isEzRez(candidate: unknown): candidate is AnyResult {
     const failure = data(candidate, "failure");
     return (
       object(failure) &&
-      typeof data(failure, "type") === "string" &&
+      typeof data(failure, "tag") === "string" &&
       typeof data(failure, "message") === "string" &&
       hasData(failure, "cause") &&
       snapshot(data(failure, "cause"))

@@ -5,7 +5,7 @@ it("round-trips supported success payloads and failure custom fields", () => {
   const results = [
     ok(null),
     ok({ id: "u", values: [1, true, "x", null] }),
-    fail({ type: "MISSING", message: "Missing", data: { id: "u" } }),
+    fail({ tag: "MISSING", message: "Missing", data: { id: "u" } }),
   ];
   for (const result of results) {
     expect(JSON.parse(JSON.stringify(result))).toEqual(result);
@@ -34,7 +34,7 @@ it("rejects cyclic JSON details without rejecting repeated references", () => {
   const wrap = (details: unknown) => ({
     isSuccess: false,
     failure: {
-      type: "E",
+      tag: "E",
       message: "",
       cause: { name: "Error", message: "", cause: null, details },
     },
