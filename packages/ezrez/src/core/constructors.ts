@@ -1,5 +1,12 @@
 import { normalizeCause, normalizeContext } from "./normalize-cause.js";
-import type { ErrorDescriptor, ErrorSnapshot, Fail, FailureCause, JsonValue, Ok } from "./types.js";
+import type {
+  ErrorDescriptor,
+  ErrorSnapshot,
+  Fail,
+  FailureCauseOf,
+  JsonValue,
+  Ok,
+} from "./types.js";
 
 const descriptorKeys: Readonly<Record<string, true>> = {
   tag: true,
@@ -79,10 +86,10 @@ export function fail<const Tag extends string>(tag: Tag extends "success" ? neve
 export function fail<const Tag extends string, const D extends Error | ErrorDescriptor>(
   tag: Tag extends "success" ? never : Tag,
   descriptor: ValidDescriptor<D>,
-): Fail<Tag, FailureCause<D>>;
+): Fail<Tag, FailureCauseOf<D>>;
 export function fail<const F extends TaggedDescriptor>(
   input: ValidTaggedDescriptor<F>,
-): Fail<F["tag"], FailureCause<F>>;
+): Fail<F["tag"], FailureCauseOf<F>>;
 /** Creates an exact failure envelope with a normalized, non-null error snapshot. */
 export function fail(
   input: string | TaggedDescriptor,

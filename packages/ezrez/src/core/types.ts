@@ -9,13 +9,13 @@ export type JsonValue =
 
 export type ErrorContext = Readonly<Record<string, JsonValue>>;
 
-export type ErrorSnapshot = Readonly<{
-  name: string;
-  message: string;
-  stack?: string;
-  cause: ErrorSnapshot | null;
-  context?: ErrorContext;
-}>;
+export interface ErrorSnapshot {
+  readonly name: string;
+  readonly message: string;
+  readonly stack?: string;
+  readonly cause: ErrorSnapshot | null;
+  readonly context?: ErrorContext;
+}
 
 /** An error snapshot whose application context is known to be present and typed. */
 export type ErrorSnapshotWithContext<C extends ErrorContext> = Omit<ErrorSnapshot, "context"> & {
@@ -27,18 +27,24 @@ export type Failure<Cause extends ErrorSnapshot = ErrorSnapshot> = Readonly<{
   cause: Cause;
 }>;
 
-export type Ok<S> = Readonly<{ tag: "success"; value: S; cause?: never }>;
+/** Named success branch shape for stable editor display. */
+export interface Ok<S> {
+  readonly tag: "success";
+  readonly value: S;
+  readonly cause?: never;
+}
 
 /** A failure envelope preserves the type of its correlated error snapshot. */
-export type Fail<
-  Tag extends string,
-  Cause extends ErrorSnapshot = ErrorSnapshot,
-> = Tag extends "success" ? never : Readonly<{ tag: Tag; cause: Cause; value?: never }>;
+export interface Fail<Tag extends string, Cause extends ErrorSnapshot = ErrorSnapshot> {
+  readonly tag: Tag;
+  readonly cause: Cause;
+  readonly value?: never;
+}
 
 /** Failure result for one tag or a union of tags. */
-export type EzFailOf<T extends string> = T extends string ? Fail<T> : never;
+export type EzFailOf<T extends string> = T extends "success" ? never : Fail<T>;
 
-type AnyFailure = Fail<string, ErrorSnapshot>;
+type AnyFailure = Fail<string>;
 
 /** Expand tag shorthand while retaining complete failure envelopes. */
 type ResolveFailure<E extends string | AnyFailure> = E extends string
@@ -75,8 +81,7 @@ type DescriptorCause<D> = D extends { context: infer C extends ErrorContext }
   ? ErrorSnapshotWithContext<C>
   : ErrorSnapshot;
 
-/** Infers the normalized primary snapshot type produced by a failure descriptor. */
-export type FailureCause<D> = D extends Error ? ErrorSnapshot : DescriptorCause<D>;
+export type FailureCauseOf<D> = D extends Error ? ErrorSnapshot : DescriptorCause<D>;
 
 /** Constructor shorthand or an inline tagged error descriptor. */
 export type FailureInput<Tag extends string = string> =
@@ -87,5 +92,5 @@ export type FailureInput<Tag extends string = string> =
 export type WithCause<F extends FailureInput> = F extends string
   ? Fail<F>
   : F extends { tag: infer Tag extends string }
-    ? Fail<Tag, FailureCause<F>>
+    ? Fail<Tag, FailureCauseOf<F>>
     : never;

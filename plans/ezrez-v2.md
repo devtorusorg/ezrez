@@ -30,13 +30,13 @@ Preserve the useful reference wire shape, without preserving old function names:
 type JsonValue = string | number | boolean | null
   | readonly JsonValue[]
   | { readonly [key: string]: JsonValue };
-type ErrorSnapshot = Readonly<{
-  name: string;
-  message: string;
-  stack?: string;
-  cause: ErrorSnapshot | null;
-  context?: Readonly<Record<string, JsonValue>>;
-}>;
+interface ErrorSnapshot {
+  readonly name: string;
+  readonly message: string;
+  readonly stack?: string;
+  readonly cause: ErrorSnapshot | null;
+  readonly context?: Readonly<Record<string, JsonValue>>;
+}
 type ErrorDescriptor = Readonly<{
   name?: string;
   message?: string;
@@ -47,12 +47,16 @@ type ErrorDescriptor = Readonly<{
 type Failure = Readonly<{
   cause: ErrorSnapshot;
 }>;
-type Ok<S> = Readonly<{ tag: "success"; value: S; cause?: never }>;
-type Fail<Tag extends string> = Readonly<{
-  tag: Tag;
-  cause: ErrorSnapshot;
-  value?: never;
-}>;
+interface Ok<S> {
+  readonly tag: "success";
+  readonly value: S;
+  readonly cause?: never;
+}
+interface Fail<Tag extends string, Cause extends ErrorSnapshot = ErrorSnapshot> {
+  readonly tag: Tag;
+  readonly cause: Cause;
+  readonly value?: never;
+}
 type EzRez<S, E extends string | Fail<string> = never> =
   | ([S] extends [never] ? never : Ok<S>)
   | ([E] extends [never] ? never : ResolveFailure<E>);

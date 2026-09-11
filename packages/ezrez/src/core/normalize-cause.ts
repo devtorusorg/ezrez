@@ -83,7 +83,7 @@ function detail(value: unknown, depth: number, ancestors: Set<object>): JsonValu
     const kind = tag(value);
     if (kind === "[object Error]" || existingSnapshot(value)) {
       // ErrorSnapshot contains only JSON-safe data; expose it as an ordinary context value.
-      return { ...snapshot(value, depth, ancestors) };
+      return { ...snapshot(value, depth, ancestors) } as JsonValue;
     }
     if (kind === "[object Date]") {
       const time = Date.prototype.getTime.call(value);
