@@ -42,8 +42,8 @@ function existingSnapshot(value: object): value is ErrorSnapshot {
   const plain = prototype === null || Object.getPrototypeOf(prototype) === null;
   return (
     plain &&
-    Object.getOwnPropertyNames(value).every((key) => standardKeys.has(key) || key === "details") &&
-    isEzRez({ isSuccess: false, failure: { tag: "snapshot", message: "", cause: value } })
+    Object.getOwnPropertyNames(value).every((key) => standardKeys.has(key) || key === "context") &&
+    isEzRez({ tag: "snapshot", cause: value })
   );
 }
 
@@ -82,7 +82,7 @@ function detail(value: unknown, depth: number, ancestors: Set<object>): JsonValu
   try {
     const kind = tag(value);
     if (kind === "[object Error]" || existingSnapshot(value)) {
-      // ErrorSnapshot contains only JSON-safe data; expose it as an ordinary detail object.
+      // ErrorSnapshot contains only JSON-safe data; expose it as an ordinary context value.
       return { ...snapshot(value, depth, ancestors) };
     }
     if (kind === "[object Date]") {
@@ -132,7 +132,7 @@ function snapshot(value: unknown, depth: number, ancestors: Set<object>): ErrorS
       message: string;
       stack?: string;
       cause: ErrorSnapshot | null;
-      details?: Record<string, JsonValue>;
+      context?: Record<string, JsonValue>;
     } = {
       name: typeof name === "string" ? name : "NonError",
       message: typeof message === "string" ? message : "Unknown error",
@@ -141,15 +141,15 @@ function snapshot(value: unknown, depth: number, ancestors: Set<object>): ErrorS
     if (typeof stack === "string") output.stack = stack;
     try {
       if (existingSnapshot(value)) {
-        const details = read(value, "details");
-        if (details !== undefined)
-          output.details = properties(details as object, depth + 1, ancestors);
+        const context = read(value, "context");
+        if (context !== undefined)
+          output.context = properties(context as object, depth + 1, ancestors);
       } else {
-        const details = properties(value, depth + 1, ancestors, standardKeys);
-        if (Object.keys(details).length > 0) output.details = details;
+        const context = properties(value, depth + 1, ancestors, standardKeys);
+        if (Object.keys(context).length > 0) output.context = context;
       }
     } catch {
-      output.details = { $ezrez: "unreadable" };
+      output.context = { $ezrez: "unreadable" };
     }
     return output;
   } finally {
@@ -159,9 +159,14 @@ function snapshot(value: unknown, depth: number, ancestors: Set<object>): ErrorS
 
 /**
  * Takes a fresh JSON/structured-clone-safe snapshot, preserving custom own data
- * fields under details. Unsupported values become informational $ezrez markers.
+ * fields under context. Unsupported values become informational $ezrez markers.
  * Does not preserve prototypes, references or executable behavior. Depth limit: 16.
  */
 export function normalizeCause(value: unknown): ErrorSnapshot | null {
   return value == null ? null : snapshot(value, 0, new Set());
+}
+
+/** Normalizes descriptor context without mixing its keys into the Error fields. */
+export function normalizeContext(value: object): Readonly<Record<string, JsonValue>> {
+  return properties(value, 0, new Set());
 }

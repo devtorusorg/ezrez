@@ -1,16 +1,94 @@
-import { normalizeCause } from "./normalize-cause.js";
-import type { Fail, FailureInput, Ok, WithCause } from "./types.js";
+import { normalizeCause, normalizeContext } from "./normalize-cause.js";
+import type { ErrorDescriptor, ErrorSnapshot, Fail, JsonValue, Ok } from "./types.js";
 
-export function ok<S>(value: S): Ok<S> {
-  return { isSuccess: true, value };
+const descriptorKeys: Readonly<Record<string, true>> = {
+  tag: true,
+  name: true,
+  message: true,
+  stack: true,
+  cause: true,
+  context: true,
+};
+
+type TaggedDescriptor<Tag extends string = string> = Readonly<{ tag: Tag } & ErrorDescriptor>;
+type ValidTaggedDescriptor<F extends TaggedDescriptor> = F["tag"] extends "success"
+  ? never
+  : Exclude<keyof F, keyof TaggedDescriptor> extends never
+    ? F
+    : never;
+
+function isNativeError(value: Error | ErrorDescriptor): value is Error {
+  return value instanceof Error || Object.prototype.toString.call(value) === "[object Error]";
 }
 
-/** Creates a plain failure and normalizes native Error causes to plain snapshots. */
-export function fail<const F extends FailureInput>(failure: F): Fail<WithCause<F>> {
-  // The distributive type preserves each input union member and makes cause required.
-  // Spreading creates a new data object; the only transformed field is cause.
+function assertDescriptor(value: ErrorDescriptor, tagged: boolean): void {
+  if (
+    Object.getOwnPropertySymbols(value).length > 0 ||
+    !Object.getOwnPropertyNames(value).every(
+      (key) => descriptorKeys[key] === true && (tagged || key !== "tag"),
+    )
+  )
+    throw new TypeError("Failure descriptor contains unsupported fields");
+  if (value.name !== undefined && typeof value.name !== "string")
+    throw new TypeError("Failure descriptor name must be a string");
+  if (value.message !== undefined && typeof value.message !== "string")
+    throw new TypeError("Failure descriptor message must be a string");
+  if (value.stack !== undefined && typeof value.stack !== "string")
+    throw new TypeError("Failure descriptor stack must be a string");
+  if (
+    value.context !== undefined &&
+    (typeof value.context !== "object" || value.context === null || Array.isArray(value.context))
+  )
+    throw new TypeError("Failure descriptor context must be an object");
+}
+
+function snapshot(
+  tag: string,
+  descriptor?: Error | ErrorDescriptor,
+  tagged = false,
+): ErrorSnapshot {
+  if (descriptor === undefined) return { name: "Error", message: tag, cause: null };
+  if (isNativeError(descriptor)) return normalizeCause(descriptor) as ErrorSnapshot;
+  assertDescriptor(descriptor, tagged);
+  const output: {
+    name: string;
+    message: string;
+    stack?: string;
+    cause: ErrorSnapshot | null;
+    context?: Readonly<Record<string, JsonValue>>;
+  } = {
+    name: descriptor.name ?? "Error",
+    message: descriptor.message ?? tag,
+    cause: normalizeCause(descriptor.cause),
+  };
+  if (descriptor.stack !== undefined) output.stack = descriptor.stack;
+  if (descriptor.context !== undefined) output.context = normalizeContext(descriptor.context);
+  return output;
+}
+
+export function ok<S>(value: S): Ok<S> {
+  return { tag: "success", value };
+}
+
+export function fail<const Tag extends string>(tag: Tag extends "success" ? never : Tag): Fail<Tag>;
+export function fail<const Tag extends string>(
+  tag: Tag extends "success" ? never : Tag,
+  descriptor: Error | ErrorDescriptor,
+): Fail<Tag>;
+export function fail<const F extends TaggedDescriptor>(
+  input: ValidTaggedDescriptor<F>,
+): Fail<F["tag"]>;
+/** Creates an exact failure envelope with a normalized, non-null error snapshot. */
+export function fail(
+  input: string | TaggedDescriptor,
+  descriptor?: Error | ErrorDescriptor,
+): Fail<string> {
+  const tag = typeof input === "string" ? input : input.tag;
+  if (tag === "success") throw new TypeError('Failure tag "success" is reserved');
+  if (typeof tag !== "string") throw new TypeError("Failure tag must be a string");
+  if (typeof input !== "string") assertDescriptor(input, true);
   return {
-    isSuccess: false,
-    failure: { ...failure, cause: normalizeCause(failure.cause) },
-  } as Fail<WithCause<F>>;
+    tag,
+    cause: snapshot(tag, typeof input === "string" ? descriptor : input, typeof input !== "string"),
+  };
 }

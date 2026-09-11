@@ -3,6 +3,7 @@ export { isError, isEzRez, isSuccess } from "./guards.js";
 export type {
   AnyResult,
   ErrorOf,
+  ErrorDescriptor,
   ErrorSnapshot,
   EzFailOf,
   EzRez,

@@ -1,22 +1,24 @@
-import type { AnyResult, ErrorOf, EzRez, Failure, Prettify, SuccessOf } from "../core/types.js";
+import type { AnyResult, ErrorOf, EzRez, SuccessOf } from "../core/types.js";
 
-type ErrorTags<R extends AnyResult> = ErrorOf<R> extends infer E extends Failure ? E["tag"] : never;
 type SimplifiedErrors<R extends AnyResult> =
-  ErrorOf<R> extends infer E extends Failure
-    ? [Exclude<keyof E, keyof Failure>] extends [never]
-      ? ErrorTags<R>
-      : Prettify<E>
+  ErrorOf<R> extends infer E extends { tag: string; cause: unknown }
+    ? [Exclude<keyof E, "tag" | "cause" | "value">] extends [never]
+      ? E["tag"]
+      : E
     : never;
 
 /**
- * Optional return-type normalization for ordinary synchronous result functions.
- * Identity at runtime: does not catch exceptions, wrap calls or transform results.
+ * Optional return-type normalization for synchronous or Promise-returning result functions.
+ * Identity at runtime: does not catch exceptions, handle promises or transform results.
  * Generic, overloaded and explicit-this signatures should use native inference.
  */
 export function define<A extends unknown[], R extends AnyResult>(
   callback: (...args: A) => R,
-): (...args: A) => EzRez<SuccessOf<R>, SimplifiedErrors<R>> {
-  // The implementation is identity; Simplified only changes the public type.
-  // TS cannot prove this relationship for a still-generic conditional type.
-  return callback as unknown as (...args: A) => EzRez<SuccessOf<R>, SimplifiedErrors<R>>;
+): (...args: A) => EzRez<SuccessOf<R>, SimplifiedErrors<R>>;
+export function define<A extends unknown[], R extends AnyResult>(
+  callback: (...args: A) => Promise<R>,
+): (...args: A) => Promise<EzRez<SuccessOf<R>, SimplifiedErrors<R>>>;
+export function define(callback: (...args: never[]) => unknown): (...args: never[]) => unknown {
+  // The implementation is identity; normalization only changes the public type.
+  return callback;
 }

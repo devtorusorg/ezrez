@@ -5,12 +5,10 @@ import type { ErrorOf, ErrorSnapshot, EzFailOf, EzRez, Fail, Ok, Simplified } fr
 
 type MathTag = "DIVIDE_BY_ZERO" | "TOO_BIG_NUMBER" | "SOMETHING_ELSE";
 type MathFailure = EzFailOf<MathTag>;
-type TooBig = EzFailOf<"TOO_BIG_NUMBER"> & { limit: number };
-type Mixed = EzRez<number, "DIVIDE_BY_ZERO" | TooBig>;
 
 function divide(a: number, b: number): EzRez<number, MathTag> {
-  if (b === 0) return fail({ tag: "DIVIDE_BY_ZERO", message: "Cannot divide by zero" });
-  if (a > 100) return fail({ tag: "TOO_BIG_NUMBER", message: "Too big" });
+  if (b === 0) return fail({ tag: "DIVIDE_BY_ZERO" });
+  if (a > 100) return fail({ tag: "TOO_BIG_NUMBER" });
   return ok(a / b);
 }
 
@@ -18,8 +16,8 @@ it("distributes tag unions into failure payloads and preserves impossible branch
   expectTypeOf<EzFailOf<"A">>().toEqualTypeOf<
     Readonly<{
       tag: "A";
-      message: string;
-      cause: ErrorSnapshot | null;
+      cause: ErrorSnapshot;
+      value?: never;
     }>
   >();
   expectTypeOf<EzFailOf<"A" | "B">>().toEqualTypeOf<EzFailOf<"A"> | EzFailOf<"B">>();
@@ -33,13 +31,12 @@ it("distributes tag unions into failure payloads and preserves impossible branch
   expectTypeOf<EzRez<number>>().toEqualTypeOf<Ok<number>>();
   expectTypeOf<EzRez<number, never>>().toEqualTypeOf<Ok<number>>();
   expectTypeOf<EzRez<number, EzFailOf<never>>>().toEqualTypeOf<Ok<number>>();
-  expectTypeOf<EzRez<never, "A">>().toEqualTypeOf<Fail<EzFailOf<"A">>>();
+  expectTypeOf<EzRez<never, "A">>().toEqualTypeOf<Fail<"A">>();
   expectTypeOf<EzRez<never, never>>().toEqualTypeOf<never>();
 });
 
 it("works with native inference, explicit annotations, define and branch guards", () => {
-  const native = (a: number, b: number) =>
-    b === 0 ? fail({ tag: "DIVIDE_BY_ZERO", message: "Cannot divide by zero" }) : ok(a / b);
+  const native = (a: number, b: number) => (b === 0 ? fail({ tag: "DIVIDE_BY_ZERO" }) : ok(a / b));
   const annotated: (a: number, b: number) => EzRez<number, "DIVIDE_BY_ZERO"> = native;
   const wrapped = define(native);
   expectTypeOf<ErrorOf<ReturnType<typeof native>>["tag"]>().toEqualTypeOf<"DIVIDE_BY_ZERO">();
@@ -48,75 +45,51 @@ it("works with native inference, explicit annotations, define and branch guards"
   expectTypeOf(define(divide)).returns.toEqualTypeOf<EzRez<number, MathTag>>();
   expect(wrapped(6, 0)).toEqual(annotated(6, 0));
   const result = divide(6, 0);
-  if (isError(result)) expectTypeOf(result.failure).toEqualTypeOf<MathFailure>();
+  if (isError(result)) expectTypeOf(result.cause).toEqualTypeOf<ErrorSnapshot>();
   if (isSuccess(result)) expectTypeOf(result.value).toEqualTypeOf<number>();
   const asyncDivide = async (a: number, b: number): Promise<EzRez<number, MathTag>> => divide(a, b);
   expectTypeOf<ErrorOf<Awaited<ReturnType<typeof asyncDivide>>>>().toEqualTypeOf<MathFailure>();
 });
 
-it("preserves custom failure members and narrows mixed unions", () => {
-  expectTypeOf<ErrorOf<Mixed>>().toEqualTypeOf<EzFailOf<"DIVIDE_BY_ZERO"> | TooBig>();
-  const evaluate = (n: number): Mixed =>
-    n > 100
-      ? fail({ tag: "TOO_BIG_NUMBER", message: "Too big", limit: 100 })
-      : fail({ tag: "DIVIDE_BY_ZERO", message: "Zero" });
-  const result = evaluate(101);
-  expect(isError(result)).toBe(true);
-  if (isError(result)) {
-    if (result.failure.tag === "TOO_BIG_NUMBER") {
-      expectTypeOf(result.failure.limit).toEqualTypeOf<number>();
-      expect(result.failure.limit).toBe(100);
-    } else {
-      expectTypeOf(result.failure).toEqualTypeOf<EzFailOf<"DIVIDE_BY_ZERO">>();
-    }
-  }
-});
-
-it("requires tag on the wire but preserves unrelated custom type fields", () => {
-  expect(isEzRez({ isSuccess: false, failure: { type: "OLD", message: "", cause: null } })).toBe(
-    false,
-  );
+it("keeps diagnostic context owned by the normalized native error", () => {
+  expect(isEzRez({ tag: "OLD", type: "OLD", cause: null })).toBe(false);
   const error = Object.assign(new Error("native"), { type: "CustomErrorKind" });
-  const result = fail({ tag: "NEW", type: "custom-metadata", message: "", cause: error });
-  expectTypeOf(result.failure.tag).toEqualTypeOf<"NEW">();
-  expect(result.failure.type).toBe("custom-metadata");
-  expect(result.failure.cause.details).toEqual({ type: "CustomErrorKind" });
+  const result = fail("NEW", error);
+  expectTypeOf(result.tag).toEqualTypeOf<"NEW">();
+  expect(result.cause.context).toEqual({ type: "CustomErrorKind" });
   for (const transported of [JSON.parse(JSON.stringify(result)), structuredClone(result)]) {
     expect(transported).toEqual(result);
     expect(isEzRez(transported)).toBe(true);
   }
 });
 
-function invalidFixtures(result: EzRez<number, MathTag>, mixed: Mixed) {
+function invalidFixtures(result: EzRez<number, MathTag>) {
   // @ts-expect-error Only string tags can be expanded.
   type InvalidHelper = EzFailOf<123>;
   // @ts-expect-error Error inputs must be strings or complete failure objects.
   type InvalidResult = EzRez<number, 123>;
-  // @ts-expect-error Object variants must include the full base failure structure.
+  // @ts-expect-error Object variants must include the normalized cause.
   type Incomplete = EzRez<number, { tag: "A" }>;
   // @ts-expect-error A legacy discriminator is not a tag.
-  fail({ type: "OLD", message: "" });
+  fail({ type: "OLD" });
+  // @ts-expect-error Descriptors accept only Error fields.
+  fail("OLD", { message: "legacy", extra: true });
+  // @ts-expect-error The success tag is reserved.
+  fail({ tag: "success" });
   // @ts-expect-error Tags must be strings.
-  fail({ tag: 123, message: "" });
+  fail({ tag: 123 });
   // @ts-expect-error An unlisted error cannot be returned.
-  const wrongTag: EzRez<number, MathTag> = fail({ tag: "UNKNOWN", message: "" });
-  // @ts-expect-error Mixed custom variants retain required fields.
-  const missingLimit: Mixed = fail({ tag: "TOO_BIG_NUMBER", message: "" });
+  const wrongTag: EzRez<number, MathTag> = fail({ tag: "UNKNOWN" });
+  // @ts-expect-error Failure envelopes accept no custom top-level fields.
+  fail({ tag: "TOO_BIG_NUMBER", limit: 100 });
   // @ts-expect-error Success-only results still cannot fail.
-  const noErrors: EzRez<number> = fail({ tag: "A", message: "" });
+  const noErrors: EzRez<number> = fail({ tag: "A" });
   if (isError(result)) {
-    // @ts-expect-error Tag-only annotations do not promise custom fields.
-    result.failure.limit;
-    // @ts-expect-error The discriminator was renamed to tag.
-    result.failure.type;
+    // @ts-expect-error Failure envelopes contain no custom top-level fields.
+    result.limit;
+    // @ts-expect-error The obsolete failure container is not present.
+    result.failure;
   }
-  if (isError(mixed) && mixed.failure.tag === "DIVIDE_BY_ZERO") {
-    // @ts-expect-error Only the TOO_BIG_NUMBER variant has a limit.
-    mixed.failure.limit;
-  }
-  return [wrongTag, missingLimit, noErrors] as unknown as
-    | InvalidHelper
-    | InvalidResult
-    | Incomplete;
+  return [wrongTag, noErrors] as unknown as InvalidHelper | InvalidResult | Incomplete;
 }
 void invalidFixtures; // Checked by tsc, not executed.
