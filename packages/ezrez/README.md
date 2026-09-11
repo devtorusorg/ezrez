@@ -55,15 +55,15 @@ import type { EzRez, ErrorOf, SuccessOf } from "ezrez";
 
 function loadUser(id: string) {
   if (!id) {
-    return ez.fail({ type: "INVALID_ID", message: "ID is required" });
+    return ez.fail("INVALID_ID");
   }
   return ez.ok({ id });
 }
 
 const result = loadUser("123");
 if (ez.isError(result)) {
-  result.failure.type;  // "INVALID_ID", not string
-  result.failure.cause; // null
+  result.tag;   // "INVALID_ID", not string
+  result.cause; // ErrorSnapshot
 } else {
   result.value.id;      // string
 }
@@ -80,35 +80,94 @@ function count(): EzRez<number> { // Error parameter defaults to never
 `EzRez<S, E>` is a plain discriminated union:
 
 ```ts
-{ isSuccess: true, value: S }
+{ tag: "success", value: S }
 // or
-{ isSuccess: false, failure: E }
+{ tag: FailureTag, cause: ErrorSnapshot }
 ```
 
-`E` must extend `{ type: string; message: string; cause: ErrorSnapshot | null }`.
-Add your own fields, including `data`, and combine complete failure types in an error union.
-Constructors preserve custom fields and failure-tag literals. They return only their own branch;
-`ok` does not introduce a possible failure. Ordinary success payloads are not inferred deeply readonly.
+`"success"` is reserved for the success branch. Every failure tag lives at the result boundary.
+Every failure has a non-null normalized snapshot. With only a tag, `fail` creates
+`{ name: "Error", message: tag, cause: null }`; there is no failure-specific message outside that
+snapshot.
+
+`Failure` describes the base `{ cause }` field. `E` accepts string tags, complete `Fail<Tag>`
+branches, or a mix of both. String tags expand to failure branches automatically. Failure
+envelopes contain exactly `tag` and `cause`; diagnostic metadata belongs to the normalized error's
+`context`. Constructors preserve failure-tag literals and return only their own branch; `ok` does
+not introduce a possible failure. Ordinary success payloads are not inferred deeply readonly.
 
 `EzRez<S, never>` has only a success branch; `EzRez<never, E>` has only a failure branch;
 `EzRez<never, never>` is `never`. `SuccessOf<R>` and `ErrorOf<R>` distribute across return branches,
 and return `never` if their branch is absent. Native async functions also work: inspect their
 results with `ErrorOf<Awaited<ReturnType<typeof yourAsyncFunction>>>`.
 
-Readonly types describe the envelope; constructors do not freeze, deep-clone or validate payloads.
-`fail` shallow-copies the failure input and defaults an omitted/undefined cause to `null`.
+Readonly types describe the envelope; constructors do not freeze, deep-clone or validate success
+payloads. `fail(tag)`, `fail(tag, descriptor)`, and `fail({ tag, ...descriptor })` merge descriptor
+fields into the default snapshot. `fail(tag, nativeError)` instead uses the normalized native Error
+as the primary snapshot. A dynamically supplied `"success"` failure tag throws because it would
+collide with the success branch.
 Use `as const` or explicit types for tags in previously declared variables if they have already
 widened to `string`; constructors cannot recover lost literals.
 
+### Shorthand error types
+
+```ts
+import { define, fail, ok, type EzFailOf, type EzRez } from "ezrez";
+
+type DivideByZeroFailure = EzFailOf<"DIVIDE_BY_ZERO">;
+// Readonly<{
+//   tag: "DIVIDE_BY_ZERO";
+//   cause: ErrorSnapshot;
+//   value?: never;
+// }>
+
+type MathFailure = EzFailOf<"DIVIDE_BY_ZERO" | "TOO_BIG_NUMBER" | "SOMETHING_ELSE">;
+// A union of separate failure result branches.
+
+function divide(a: number, b: number): EzRez<number, "DIVIDE_BY_ZERO" | "TOO_BIG_NUMBER"> {
+  if (b === 0) return fail("DIVIDE_BY_ZERO");
+  if (a > 100) return fail("TOO_BIG_NUMBER");
+  return ok(a / b);
+}
+
+// Optional return-type normalization; native inference is also supported directly.
+const easytype = define(divide);
+type ResultByTags = EzRez<number, "DIVIDE_BY_ZERO" | "TOO_BIG_NUMBER">;
+type ResultByHelper = EzRez<number, EzFailOf<"DIVIDE_BY_ZERO" | "TOO_BIG_NUMBER">>;
+// ResultByTags and ResultByHelper are equivalent.
+
+type OnlyZero = Extract<MathFailure, { tag: "DIVIDE_BY_ZERO" }>;
+```
+
+`EzFailOf` distributes over string unions, so extraction and narrowing work per tag.
+`EzFailOf<never>` is `never`; the error parameter of `EzRez` still defaults to `never`.
+`ErrorOf<R>` extracts complete failure result branches, **not** bare tags or nested details.
+The helper is exported from both `ezrez` and `ezrez/core` and adds no runtime code.
+
+Failure envelopes intentionally accept no application data and always contain an `ErrorSnapshot`.
+Expected domain failures receive the default snapshot automatically. Data referenced by a native
+Error is preserved under `cause.context`.
+
+### Tagged result envelope
+
+Use `fail("ERROR")`, `fail("ERROR", descriptor)`, or `fail("ERROR", error)`, then inspect
+`result.tag` or `result.cause`. The equivalent inline descriptor form is
+`fail({ tag: "ERROR", ...descriptor })`. Stored or transported results using
+`{ isSuccess, value | failure }`, nested failure details, nullable top-level causes, or custom
+top-level failure fields must migrate to the exact `{ tag, cause: ErrorSnapshot }` shape. There is
+no automatic migration or alias. Native Error custom fields are preserved inside the normalized
+snapshot's `context`. Historical reference sources are unchanged.
+
 ### Guards
 
-- `isSuccess(result)` and `isError(result)` narrow an already-typed result, preserving its branches.
-- `isEzRez(unknown)` checks own data fields, the envelope, failure base fields, nested causes and
-  JSON-safe `details`. Conflicting success/failure fields, malformed snapshots and cyclic details
-  are rejected. It tolerates hostile reflection by returning false, not throwing.
-- The boundary guard does **not** validate success contents, custom failure fields or application
-  error tags, and does not accept a generic parameter claiming otherwise. Validate those with your
-  application schema before treating a transported result as `EzRez<User, SpecificError>`.
+- `isSuccess(result)` and `isError(result)` narrow an already-typed result by its outer tag while
+  preserving exact branches.
+- `isEzRez(unknown)` checks exact own envelope fields, the normalized cause, and JSON-safe snapshot
+  `context`. Conflicting fields, obsolete failure containers, extra envelope fields, malformed
+  snapshots, and cyclic context are rejected. Hostile reflection returns false rather than throwing.
+- The boundary guard does **not** validate success contents or application error tags, and does not
+  accept a generic parameter claiming otherwise. Validate those with your application schema before
+  treating a transported result as `EzRez<User, SpecificError>`.
 
 ## Optional function normalization
 
@@ -116,64 +175,81 @@ widened to `string`; constructors cannot recover lost literals.
 import { define, ok, fail } from "ezrez";
 
 const load = define((id: string) => {
-  if (!id) return fail({ type: "INVALID_ID", message: "ID required" });
+  if (!id) return fail({ tag: "INVALID_ID" });
   return ok({ id });
 });
 // Public return type: EzRez<{ id: string }, InvalidIdFailure>
 const count = define(() => ok(1)); // () => EzRez<number, never>
+
+const loadAsync = define(async (id: string) => {
+  if (!id) return fail({ tag: "INVALID_ID" });
+  return ok({ id });
+});
+// Public return type: Promise<EzRez<{ id: string }, "INVALID_ID">>
+type LoadedAsync = Awaited<ReturnType<typeof loadAsync>>;
 ```
 
-Native TypeScript typically displays `Ok<A> | Ok<B> | Fail<E>`. This is already a valid result.
-`define` exposes `EzRez<A | B, E>` by extracting and combining the callback's return branches;
-it is entirely optional. Editor tooltips may still expand aliases. Combining branches may lose
+Native TypeScript typically displays `Ok<A> | Ok<B> | Fail<Tag>`. This is already a valid
+result. `define` exposes a simplified `EzRez<A | B, E>` by extracting and combining the callback's
+return branches. Base failures are reduced to their tag strings. `Prettify` and `Simplified` are
+also available as type helpers. The simplification is entirely optional. Editor tooltips may still
+expand aliases. Combining branches may lose
 correlations between individual return branches, so prefer native inference when those matter.
 
-At runtime `define(callback) === callback`: no per-call wrapper, catching, Promise handling or result
-transformation. Optional/rest parameters are preserved. This helper targets ordinary synchronous,
-non-generic functions. Generic, overloaded and explicit-`this` signatures should use native inference
-or explicit annotations. Promise-returning and non-result callbacks are rejected by its types.
+At runtime `define(callback) === callback`: no per-call wrapper, Promise handling, catching or result
+transformation. Optional/rest parameters are preserved. This helper targets ordinary synchronous
+or Promise-returning, non-generic functions. Generic, overloaded and explicit-`this` signatures
+should use native inference or explicit annotations. Non-result callbacks are rejected by its types.
 
 ## Exception snapshots and custom error fields
 
 ```ts
-import { fail, normalizeCause } from "ezrez";
+import { fail } from "ezrez";
 
 class HttpError extends Error {
   status = 503;
   context = { retryable: true };
 }
 
-const result = fail({
-  type: "NETWORK",
-  message: "Could not load user",
-  cause: normalizeCause(new HttpError("Unavailable")),
-});
-// result.failure.cause:
+const result = fail("NETWORK", new HttpError("Unavailable"));
+// result.cause:
 // {
 //   name: "Error", message: "Unavailable", stack: "...", cause: null,
-//   details: { status: 503, context: { retryable: true } }
+//   context: { status: 503, context: { retryable: true } }
 // }
 ```
 
-`fail` accepts a plain `ErrorSnapshot | null`, **not** a native Error. `normalizeCause(unknown)`
-creates a fresh snapshot compatible with both JSON and `structuredClone`:
+`fail(tag, nativeError)` always stores a fresh plain `ErrorSnapshot`, so native Errors are normalized
+automatically. Descriptor calls merge defined `name`, `message`, `stack`, `cause`, and `context`
+fields into `{ name: "Error", message: tag, cause: null }`; `undefined` does not erase defaults.
+In descriptor forms, `cause` is the snapshot's nested cause. Use the two-argument native Error form
+when the Error itself should be the primary snapshot. `normalizeCause(unknown)` remains useful to
+explicitly snapshot an exception and creates data compatible with both JSON and `structuredClone`:
 
 ```ts
+type ErrorDescriptor = Readonly<{
+  name?: string;
+  message?: string;
+  stack?: string;
+  cause?: unknown;
+  context?: Readonly<Record<string, JsonValue>>;
+}>;
+
 type ErrorSnapshot = Readonly<{
   name: string;
   message: string;
   stack?: string;
   cause: ErrorSnapshot | null;
-  details?: Readonly<Record<string, JsonValue>>;
+  context?: Readonly<Record<string, JsonValue>>;
 }>;
 ```
 
 - Null/undefined input becomes `null`. Primitive thrown values get a `NonError` name and string
   message; error-like objects use available string name/message/stack, with safe fallbacks.
-- Own string-keyed custom data fields—including non-enumerable fields—are preserved in `details`.
-  Standard name/message/stack/cause fields stay at the top level. A custom field called `details`
-  on an Error becomes `snapshot.details.details`; existing valid plain snapshots are recognized
-  without repeatedly nesting their details. A structurally identical plain error-like object is
+- Own string-keyed custom data fields—including non-enumerable fields—are preserved in `context`.
+  Standard name/message/stack/cause fields stay at the top level. A custom field called `context`
+  on an Error becomes `snapshot.context.context`; existing valid plain snapshots are recognized
+  without repeatedly nesting their context. A structurally identical plain error-like object is
   likewise treated as an existing snapshot.
 - JSON-safe primitives, nested object data and array elements are preserved. Negative zero becomes
   zero. Nested Errors become snapshots, Dates become ISO strings, and AggregateError's own `errors`
@@ -184,8 +260,8 @@ type ErrorSnapshot = Readonly<{
   `unsupported-object`, `accessor`, `unreadable`, `circular` and `max-depth`.
   Map/Set/typed arrays and custom `Symbol.toStringTag` objects are not expanded.
 - Cycles are detected on the current traversal path; repeated non-cyclic references are copied.
-  Cause/detail nesting is capped at 16. Truncated causes become terminal snapshots with name
-  `NormalizationError` and message `circular` or `max-depth`; truncated details use markers.
+  Cause/context nesting is capped at 16. Truncated causes become terminal snapshots with name
+  `NormalizationError` and message `circular` or `max-depth`; truncated context uses markers.
 - Custom-field accessors are not invoked; property reflection failures get markers. Standard
   name/message/stack/cause reads are guarded but may execute standard-field getters. No user
   `toJSON` method is called. Proxy traps may execute during inspection, but thrown failures are
@@ -198,9 +274,9 @@ before normalization. **Stacks and custom fields may contain secrets: redact bef
 
 ### Serialization contract
 
-The result envelope and normalized error snapshots support both JSON and structured clone.
-Success values and custom **failure** fields remain unrestricted: whole-result round trips only
-work when those application payloads support the chosen serialization method.
+The exact failure envelope and normalized error snapshots support both JSON and structured clone.
+Success values remain unrestricted, so whole-result round trips require the success payload to
+support the chosen serialization method.
 
 ```ts
 const result = ok({ id: "123" });
@@ -209,15 +285,15 @@ structuredClone(result);
 ```
 
 For example, JSON drops `ok(undefined).value`, cannot encode bigint or cycles, and does not preserve
-Date/Map semantics. Structured clone rejects functions. The library does not silently rewrite your
-success payloads or custom failure data. `normalizeCause` normalizes only exception snapshots.
+Date/Map semantics. Structured clone rejects functions. The library does not silently rewrite
+success payloads; `normalizeCause` normalizes exception snapshots.
 
 ## Incremental scope
 
 This first implementation includes `ok`, `fail`, the three guards, result/extraction types,
 `define`, and `normalizeCause`. Failure factories, recovery chains, exception-catching adapters,
-async wrappers and other convenience utilities are deferred. The old implementation remains
-reference material only; its names/signatures are not a compatibility contract.
+and other convenience utilities are deferred. The old implementation remains reference material
+only; its names/signatures are not a compatibility contract.
 
 ## Development
 
@@ -242,7 +318,7 @@ explicit `.js` relative specifiers (verified by the JSR dry run).
 `check` runs formatting, linting, `tsc` (including compile-time test assertions), and Vitest.
 Consumer checks pack the package and exercise all three ESM/CJS entry points and declarations.
 Tree-shaking checks use Bun's browser ESM bundler, with named and static namespace imports and a
-512-byte constructor-only regression ceiling; Bun is already the project's package manager.
+512-byte `ok`-only regression ceiling; Bun is already the project's package manager.
 
 ### IDE error playground
 

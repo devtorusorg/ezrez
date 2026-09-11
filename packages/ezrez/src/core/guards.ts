@@ -1,15 +1,22 @@
 import type { AnyResult, ErrorSnapshot } from "./types.js";
+const snapshotKeys: Record<string, true> = {
+  name: true,
+  message: true,
+  stack: true,
+  cause: true,
+  context: true,
+};
 
 export function isSuccess<R extends AnyResult>(
   result: R,
-): result is Extract<R, { isSuccess: true }> {
-  return result.isSuccess === true;
+): result is Extract<R, { tag: "success" }> {
+  return result.tag === "success";
 }
 
 export function isError<R extends AnyResult>(
   result: R,
-): result is Extract<R, { isSuccess: false }> {
-  return result.isSuccess === false;
+): result is Extract<R, { cause: ErrorSnapshot }> {
+  return result.tag !== "success";
 }
 
 function object(value: unknown): value is object {
@@ -66,17 +73,23 @@ function json(candidate: unknown): boolean {
 }
 
 function snapshot(candidate: unknown): candidate is ErrorSnapshot {
+  if (!object(candidate)) return false;
   const visited = new Set<object>();
-  let current = candidate;
+  let current: unknown = candidate;
   while (current !== null) {
     if (!object(current) || visited.has(current)) return false;
     visited.add(current);
     if (typeof data(current, "name") !== "string" || typeof data(current, "message") !== "string")
       return false;
+    if (
+      Object.getOwnPropertySymbols(current).length > 0 ||
+      !Object.getOwnPropertyNames(current).every((key) => snapshotKeys[key] === true)
+    )
+      return false;
     if ("stack" in current && typeof data(current, "stack") !== "string") return false;
-    if ("details" in current) {
-      const details = data(current, "details");
-      if (!object(details) || !json(details)) return false;
+    if ("context" in current) {
+      const context = data(current, "context");
+      if (!object(context) || !json(context)) return false;
     }
     if (!hasData(current, "cause")) return false;
     current = data(current, "cause");
@@ -88,16 +101,20 @@ function snapshot(candidate: unknown): candidate is ErrorSnapshot {
 export function isEzRez(candidate: unknown): candidate is AnyResult {
   try {
     if (!object(candidate)) return false;
-    const success = data(candidate, "isSuccess");
-    if (success === true) return hasData(candidate, "value") && !("failure" in candidate);
-    if (success !== false || "value" in candidate) return false;
-    const failure = data(candidate, "failure");
+    if (Object.getOwnPropertySymbols(candidate).length > 0) return false;
+    const tag = data(candidate, "tag");
+    const keys = Object.getOwnPropertyNames(candidate);
+    if (tag === "success")
+      return (
+        keys.every((key) => key === "tag" || key === "value") &&
+        hasData(candidate, "value") &&
+        !("cause" in candidate)
+      );
     return (
-      object(failure) &&
-      typeof data(failure, "type") === "string" &&
-      typeof data(failure, "message") === "string" &&
-      hasData(failure, "cause") &&
-      snapshot(data(failure, "cause"))
+      typeof tag === "string" &&
+      keys.every((key) => key === "tag" || key === "cause") &&
+      hasData(candidate, "cause") &&
+      snapshot(data(candidate, "cause"))
     );
   } catch {
     // Revoked proxies and hostile reflection must not escape a boundary guard.

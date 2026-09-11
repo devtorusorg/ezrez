@@ -4,12 +4,13 @@ import { fail, isEzRez } from "../core/index.js";
 import { normalizeCause } from "./normalize-cause.js";
 
 function roundTrip(error: unknown) {
-  const result = fail({ type: "TEST", message: "Test", cause: normalizeCause(error) });
+  const cause = normalizeCause(error);
+  const result = cause === null ? fail("TEST") : fail("TEST", cause);
   expect(JSON.parse(JSON.stringify(result))).toEqual(result);
   expect(structuredClone(result)).toEqual(result);
   expect(isEzRez(result)).toBe(true);
   expect(isEzRez(JSON.parse(JSON.stringify(result)))).toBe(true);
-  return result.failure.cause;
+  return result.cause;
 }
 
 describe("normalizeCause", () => {
@@ -51,16 +52,16 @@ describe("normalizeCause", () => {
     expect(snapshot).toMatchObject({
       message: "offline",
       cause: { message: "socket" },
-      details: {
+      context: {
         status: 503,
         context: { retryable: true },
         details: { original: true },
         hidden: [1, "two"],
       },
     });
-    expect(snapshot?.details).toHaveProperty("__proto__", { safe: true });
-    expect(snapshot?.details).not.toHaveProperty("getSecret");
-    expect(Object.getPrototypeOf(snapshot?.details)).toBe(Object.prototype);
+    expect(snapshot?.context).toHaveProperty("__proto__", { safe: true });
+    expect(snapshot?.context).not.toHaveProperty("getSecret");
+    expect(Object.getPrototypeOf(snapshot?.context)).toBe(Object.prototype);
     expect(normalizeCause(snapshot)).toEqual(snapshot);
   });
 
@@ -72,13 +73,13 @@ describe("normalizeCause", () => {
       nested: new TypeError("inner"),
       date: new Date("2025-01-01T00:00:00.000Z"),
     });
-    expect(roundTrip(error)?.details).toMatchObject({
+    expect(roundTrip(error)?.context).toMatchObject({
       first: { x: 1 },
       second: { x: 1 },
       nested: { name: "TypeError", message: "inner" },
       date: "2025-01-01T00:00:00.000Z",
     });
-    expect(roundTrip(new AggregateError([new Error("one"), "two"], "many"))?.details).toMatchObject(
+    expect(roundTrip(new AggregateError([new Error("one"), "two"], "many"))?.context).toMatchObject(
       { errors: [{ message: "one" }, "two"] },
     );
   });
@@ -95,7 +96,7 @@ describe("normalizeCause", () => {
       invalidDate: new Date(NaN),
       negativeZero: -0,
     });
-    expect(roundTrip(error)?.details).toMatchObject({
+    expect(roundTrip(error)?.context).toMatchObject({
       undef: { $ezrez: "undefined" },
       fn: { $ezrez: "function" },
       symbol: { $ezrez: "symbol" },
@@ -108,7 +109,7 @@ describe("normalizeCause", () => {
     });
   });
 
-  it("terminates cycles and deeply nested causes/details", () => {
+  it("terminates cycles and deeply nested causes/context", () => {
     const error = new Error("cycle");
     error.cause = error;
     expect(roundTrip(error)?.cause).toEqual({
@@ -118,7 +119,7 @@ describe("normalizeCause", () => {
     });
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
-    expect(roundTrip(Object.assign(new Error("details"), { cyclic }))?.details).toEqual({
+    expect(roundTrip(Object.assign(new Error("details"), { cyclic }))?.context).toEqual({
       cyclic: { self: { $ezrez: "circular" } },
     });
     let deep: Error = new Error("leaf");
@@ -148,7 +149,7 @@ describe("normalizeCause", () => {
         throw new Error("toJSON");
       },
     });
-    expect(roundTrip(error)?.details).toEqual({
+    expect(roundTrip(error)?.context).toEqual({
       custom: { $ezrez: "accessor" },
       toJSON: { $ezrez: "function" },
     });
@@ -158,7 +159,7 @@ describe("normalizeCause", () => {
         throw new Error("tag");
       },
     });
-    expect(roundTrip(Object.assign(new Error("tagged"), { tagged }))?.details).toEqual({
+    expect(roundTrip(Object.assign(new Error("tagged"), { tagged }))?.context).toEqual({
       tagged: { $ezrez: "unsupported-object" },
     });
     expect(calls).toBe(0);
@@ -176,7 +177,7 @@ describe("normalizeCause", () => {
         },
       },
     );
-    expect(roundTrip(hostile)?.details).toEqual({ $ezrez: "unreadable" });
+    expect(roundTrip(hostile)?.context).toEqual({ $ezrez: "unreadable" });
     const revoked = Proxy.revocable({}, {});
     revoked.revoke();
     roundTrip(revoked.proxy);

@@ -1,11 +1,11 @@
 import { expect, it } from "vitest";
 import { fail, isEzRez, ok } from "./index.js";
 
-it("round-trips supported success payloads and failure custom fields", () => {
+it("round-trips supported success payloads and normalized failure causes", () => {
   const results = [
     ok(null),
     ok({ id: "u", values: [1, true, "x", null] }),
-    fail({ type: "MISSING", message: "Missing", data: { id: "u" } }),
+    fail("MISSING", Object.assign(new Error("Missing"), { id: "u" })),
   ];
   for (const result of results) {
     expect(JSON.parse(JSON.stringify(result))).toEqual(result);
@@ -20,7 +20,7 @@ it("leaves unrestricted success payloads untouched rather than promising univers
   expect(() => structuredClone(ok(fn))).toThrow();
   expect(() => JSON.stringify(ok(1n))).toThrow();
   // JSON drops undefined-valued object fields; clone preserves them.
-  expect(JSON.parse(JSON.stringify(ok(undefined)))).toEqual({ isSuccess: true });
+  expect(JSON.parse(JSON.stringify(ok(undefined)))).toEqual({ tag: "success" });
   expect(isEzRez(JSON.parse(JSON.stringify(ok(undefined))))).toBe(false);
   expect(structuredClone(ok(undefined))).toEqual(ok(undefined));
   const cyclic: { self?: unknown } = {};
@@ -29,15 +29,11 @@ it("leaves unrestricted success payloads untouched rather than promising univers
   expect(structuredClone(ok(cyclic)).value.self).toBeDefined();
 });
 
-it("rejects cyclic JSON details without rejecting repeated references", () => {
+it("rejects cyclic JSON context without rejecting repeated references", () => {
   const shared = { value: 1 };
-  const wrap = (details: unknown) => ({
-    isSuccess: false,
-    failure: {
-      type: "E",
-      message: "",
-      cause: { name: "Error", message: "", cause: null, details },
-    },
+  const wrap = (context: unknown) => ({
+    tag: "E",
+    cause: { name: "Error", message: "", cause: null, context },
   });
   expect(isEzRez(wrap({ first: shared, second: shared }))).toBe(true);
   const cyclic: Record<string, unknown> = {};

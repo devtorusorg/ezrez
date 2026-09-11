@@ -35,36 +35,45 @@ type ErrorSnapshot = Readonly<{
   message: string;
   stack?: string;
   cause: ErrorSnapshot | null;
-  details?: Readonly<Record<string, JsonValue>>;
+  context?: Readonly<Record<string, JsonValue>>;
+}>;
+type ErrorDescriptor = Readonly<{
+  name?: string;
+  message?: string;
+  stack?: string;
+  cause?: unknown;
+  context?: Readonly<Record<string, JsonValue>>;
 }>;
 type Failure = Readonly<{
-  type: string;
-  message: string;
-  cause: ErrorSnapshot | null;
+  cause: ErrorSnapshot;
 }>;
-type Ok<S> = Readonly<{ isSuccess: true; value: S }>;
-type Fail<E extends Failure> = Readonly<{ isSuccess: false; failure: E }>;
-type EzRez<S, E extends Failure = never> =
+type Ok<S> = Readonly<{ tag: "success"; value: S; cause?: never }>;
+type Fail<Tag extends string> = Readonly<{
+  tag: Tag;
+  cause: ErrorSnapshot;
+  value?: never;
+}>;
+type EzRez<S, E extends string | Fail<string> = never> =
   | ([S] extends [never] ? never : Ok<S>)
-  | ([E] extends [never] ? never : Fail<E>);
+  | ([E] extends [never] ? never : ResolveFailure<E>);
 ```
 
 - `ok(value)` returns only `Ok<S>`, never a broad result that introduces phantom failures.
-- `fail({ type, message, cause?, ...extraFields })` returns only `Fail<E>`, preserves literal tags and custom fields, and fills missing/undefined cause with `null`. Its cause input is an already-normalized `ErrorSnapshot | null`, not a native Error. Use const inference where appropriate for failures; do not unexpectedly make ordinary success payloads deeply readonly.
-- Custom failure types structurally extend `Failure`; avoid reconstructing them through conditional `data` inference as the reference does. Custom fields, like success values, must themselves be serializable for whole-result round trips.
-- `isSuccess(result)` and `isError(result)` narrow existing typed results while preserving the exact input branches. Use `Extract`-style predicates and test union inputs.
-- `isEzRez(unknown)` validates the envelope and base failure/snapshot structure, rejects conflicting branch fields, and returns a broad validated result type. It must not pretend to validate arbitrary caller-selected payload/error generics. Success payload contents remain unchecked.
-- Export `SuccessOf<R>`, `ErrorOf<R>` and `Normalize<R>` using distributive branch extraction. Success-only errors and failure-only successes resolve to `never`; `EzRez<never, never>` is `never`.
+- `fail(tag)` and `fail({ tag })` return an exact `Fail<Tag>` envelope with the default `{ name: "Error", message: tag, cause: null }` snapshot.
+- `fail(tag, descriptor)` and `fail({ tag, ...descriptor })` merge defined Error fields into that default. Descriptor `cause` is the snapshot's nested cause. `fail(tag, nativeError)` instead normalizes the Error directly as the primary snapshot. The `"success"` tag is reserved; no application data or separate outer message is accepted.
+- `isSuccess(result)` and `isError(result)` narrow existing typed results using the outer tag while preserving exact input branches.
+- `isEzRez(unknown)` validates exact tagged envelopes and top-level causes, rejecting extra fields, conflicting branch fields, and obsolete failure containers. It must not pretend to validate arbitrary caller-selected payload/error generics. Success payload contents remain unchecked.
+- Export `SuccessOf<R>`, `ErrorOf<R>` and `Normalize<R>` using distributive branch extraction. `ErrorOf` extracts complete `{ tag, cause }` failure envelopes. Success-only errors and failure-only successes resolve to `never`; `EzRez<never, never>` is `never`.
 - No classes, symbols, prototype methods, executable fields, freezing or module initialization side effects. Readonly is a TypeScript contract, not deep runtime immutability.
 
 ### Utilities
 
 - `normalizeCause(unknown): ErrorSnapshot | null` produces fresh JSON-safe plain data. Null/undefined become null; Errors and error-like objects contribute name/message/stack and recursively normalized causes. Primitive thrown values get a deterministic name/message; unrecognized objects get a stable fallback message plus safely normalized own fields, never arbitrary `JSON.stringify` or user `toJSON` execution.
-- Preserve custom error fields under optional `snapshot.details`, separate from the standardized fields. For example, `class HttpError extends Error { status = 503; context = { retryable: true }; }` yields `details: { status: 503, context: { retryable: true } }`. Include own string-keyed data properties, including non-enumerable custom fields; exclude the separately handled name/message/stack/cause. A custom field named `details` is preserved as `snapshot.details.details`. Do not copy inherited methods, symbols or private class fields. Recognize valid existing snapshots and normalize their details in place structurally, without repeatedly nesting details.
-- Recursively preserve JSON-safe custom primitives, arrays and object data fields. Normalize nested Errors to snapshots and Dates to ISO strings (invalid Dates get a marker). Use documented tagged plain-object markers such as `{ $ezrez: 'circular' }` for cycles, depth exhaustion, unreadable/accessor properties and unsupported values (undefined, functions, symbols, bigint, non-finite numbers and unsupported built-ins). These markers are informational, not a reversible codec; make clear that arbitrary custom values cannot be preserved losslessly under both JSON and structured clone. Normalize negative zero to zero. AggregateError's own `errors` data property is preserved through the same array/nested-Error path, not special recovery logic.
-- Use guarded property-descriptor inspection; do not invoke custom-field getters. Guard standard error property reads and proxy reflection failures. Use path-based cycle detection (repeated non-cyclic references can be copied) and a documented depth limit of 16 across causes and details, with terminal snapshots for truncated causes and markers for truncated detail values. Safely define keys including `__proto__` without prototype mutation. Do not depend solely on `instanceof Error`, which misses cross-realm errors.
-- Validate optional snapshot details as finite, acyclic JSON data in the structural guard without claiming to recover the original custom Error class/type. Document that snapshots preserve custom data, not prototypes or behavior, and that stack traces/custom fields may contain sensitive information requiring caller redaction before transport.
-- Keep normalization out of the constructor dependency path: `fail({ type: 'NETWORK', message: 'Request failed', cause: normalizeCause(error) })`. Both operations are accessible through the root namespace.
+- Preserve custom error fields under optional `snapshot.context`, separate from the standardized fields. For example, `class HttpError extends Error { status = 503; context = { retryable: true }; }` yields `context: { status: 503, context: { retryable: true } }`. Include own string-keyed data properties, including non-enumerable custom fields; exclude the separately handled name/message/stack/cause. A custom field named `context` is preserved as `snapshot.context.context`. Do not copy inherited methods, symbols or private class fields. Recognize valid existing snapshots and normalize their context structurally without repeatedly nesting it.
+- Recursively preserve JSON-safe custom primitives, arrays and object data fields. Normalize nested Errors to snapshots and Dates to ISO strings (invalid Dates get a marker). Use documented tagged plain-object markers such as `{ $ezrez: 'circular' }` for cycles, depth exhaustion, unreadable/accessor properties and unsupported values. These markers are informational, not a reversible codec.
+- Use guarded property-descriptor inspection; do not invoke custom-field getters. Guard standard error property reads and proxy reflection failures. Use path-based cycle detection and a depth limit of 16 across causes and context. Safely define keys including `__proto__` without prototype mutation.
+- Validate optional snapshot context as finite, acyclic JSON data without claiming to recover the original custom Error class/type. Document that snapshots preserve custom data, not prototypes or behavior.
+- `fail(tag, nativeError)` normalizes native Errors through the core normalization implementation. The public `normalizeCause` utility remains available for callers that need an explicit snapshot.
 - `define(callback)` infers its parameter tuple and branch return union `R`, exposing `(...args: Args) => Normalize<R>`. Return the same callback at runtime; do not catch exceptions or transform values. Localize and justify any implementation-only type assertion.
 - Support ordinary synchronous, non-generic callbacks, including optional/rest parameters. Reject non-result and Promise-returning callbacks. Overload/generic/explicit-this preservation is not promised; those functions should use native inference or an explicit return annotation. Any lost branch correlation and editor alias-display limitations must be documented.
 
@@ -74,13 +83,13 @@ type EzRez<S, E extends Failure = never> =
 import * as ez from 'ezrez';
 
 function load(id: string) {
-  if (!id) return ez.fail({ type: 'INVALID_ID', message: 'ID required' });
+  if (!id) return ez.fail({ tag: 'INVALID_ID' });
   return ez.ok({ id });
 }
-// Native: Ok<{ id: string }> | Fail<{ type: 'INVALID_ID'; ... }>
+// Native: Ok<{ id: string }> | Fail<'INVALID_ID'>
 // ErrorOf<ReturnType<typeof load>> retains 'INVALID_ID'.
 const normalizedLoad = ez.define(load);
-// Public return signature: EzRez<{ id: string }, InvalidIdFailure>
+// Public return signature: EzRez<{ id: string }, 'INVALID_ID'>
 const count = ez.define(() => ez.ok(1));
 // Public return signature: EzRez<number, never>
 ```
@@ -122,10 +131,10 @@ const count = ez.define(() => ez.ok(1));
 
 ## Verification
 
-- Compile-time tests, actually checked by `tsc` (not only Vitest transpilation): multiple success/failure branches, custom error unions/data, default/error `never`, failure-only/both-never cases, assignment to explicit `EzRez<S,E>`, constructor literal inference, guard narrowing, native async functions via `Awaited<ReturnType<...>>`, and no-error extraction. Use positive assertions and `@ts-expect-error` negative cases.
+- Compile-time tests, actually checked by `tsc` (not only Vitest transpilation): multiple success/failure branches, exact failure envelopes, default/error `never`, failure-only/both-never cases, assignment to explicit `EzRez<S,E>`, constructor literal inference, guard narrowing, native async functions via `Awaited<ReturnType<...>>`, and no-error extraction. Use positive assertions and `@ts-expect-error` negative cases.
 - `define` tests: identical callback reference, inferred argument tuples, success-only/failure-only/mixed normalized signatures, optional/rest arguments, and rejection of non-results/async callbacks. Confirm exceptions propagate unchanged.
-- Runtime tests: constructor shapes, absent cause becoming null, preservation of custom fields, valid/malformed envelopes and snapshots, branch conflicts, primitives and hostile objects. Cause tests cover native/cross-realm Errors, nested causes, existing snapshots (no details re-nesting), non-Error throws, cycles, depth limits and throwing getters. Add custom Error subclasses with enumerable/non-enumerable fields, nested JSON data, reserved-name collisions, nested Errors/AggregateError, Dates, unsupported-value markers, repeated references, symbol/private-field exclusions, proxy reflection failures and `__proto__` keys. Assert custom data survives both transport round trips and custom getters/toJSON are not executed.
-- For supported payload fixtures, assert equality after both `JSON.parse(JSON.stringify(result))` and `structuredClone(result)`, including failure causes and guard acceptance after transport. Explicitly test/document unsupported unrestricted payloads and lossy error normalization; no blanket guarantee for arbitrary values.
+- Runtime tests: constructor shapes, absent cause becoming null, rejection of extra envelope fields, valid/malformed envelopes and snapshots, branch conflicts, primitives and hostile objects. Cause tests cover native/cross-realm Errors, nested causes, existing snapshots without context re-nesting, non-Error throws, cycles, depth limits, throwing getters, and Error-owned custom context.
+- For supported payload fixtures, assert equality after both `JSON.parse(JSON.stringify(result))` and `structuredClone(result)`, including failure causes and guard acceptance after transport. Explicitly test/document unsupported unrestricted success payloads and lossy error normalization.
 - Bundle ESM consumers using both named imports and static namespace access from root and core. Assert unused normalization/define code is absent; verify a used utility remains. Include a small bundle-size regression ceiling calibrated to the first implementation. Do not promise CJS or dynamic-namespace tree shaking.
 - Extend consumer verification beyond import-only checks: execute constructors/guards from all three ESM/CJS entry points and compile `.mts`/`.cts` type fixtures against built declarations. Check packed contents/exports and JSR source graph, excluding tests/reference files.
 - From `packages/ezrez`, run `bun run check`, `bun run test:consumers`, the new tree-shaking script, `bun run pack:check`, and `bun run jsr:check`; run monorepo build/check for integration.
