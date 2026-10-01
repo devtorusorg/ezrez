@@ -9,6 +9,8 @@
     "format": "bun run --filter ezrez format",
     "format:check": "bun run --filter ezrez format:check",
     "lint": "bun run --filter ezrez lint",
-    "docs:dev": "bun run --filter @devtorus/ezrez-docs dev"
+    "docs:dev": "bun run --filter @devtorus/ezrez-docs dev",
+    "docs:build": "bun run --filter @devtorus/ezrez-docs build",
+    "docs:preview": "bun run --filter @devtorus/ezrez-docs preview"
   }
 }

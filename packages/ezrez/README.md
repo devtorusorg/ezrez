@@ -36,7 +36,7 @@ import * as ezrez from "@devtorus/ezrez";
 ```ts
 import * as ez from "ezrez";           // Core + utilities
 import * as core from "ezrez/core";    // Constructors, guards and types only
-import * as utils from "ezrez/utils";  // normalizeCause
+import * as utils from "ezrez/utils";  // Matching, recovery, fallback and normalization
 // Named imports work too:
 import { ok, fail, type EzRez } from "ezrez/core";
 ```
@@ -167,6 +167,69 @@ snapshot's `context`. Historical reference sources are unchanged.
   accept a generic parameter claiming otherwise. Validate those with your application schema before
   treating a transported result as `EzRez<User, SpecificError>`.
 
+## Exhaustive matching
+
+Use `match` to consume a result and require every possible branch at compile time:
+
+```ts
+const message = ez.match(loadUser("123"), {
+  success: (user) => `Loaded ${user.id}`,
+  errors: {
+    INVALID_ID: (failure) => failure.cause.message,
+  },
+});
+```
+
+Each keyed callback receives its correlated failure branch, and the return type is the union of all
+callback outputs. Exhaustive matching requires a finite literal failure-tag union; a widened
+`Fail<string>` cannot be proven exhaustive.
+
+For a reusable matcher, supply the result type explicitly:
+
+```ts
+type LoadResult = ReturnType<typeof loadUser>;
+
+const describeLoad = ez.match<LoadResult>()({
+  success: (user) => `Loaded ${user.id}`,
+  errors: {
+    INVALID_ID: () => "Invalid ID",
+  },
+});
+```
+
+`matchAsync` accepts a result or promised result, permits sync or async callbacks, and always returns
+a `Promise`.
+
+## Recovery and fallback
+
+Recovery callbacks return another result. The first matching catcher runs, successes pass through,
+and unmatched failures remain in the output type:
+
+```ts
+const recovered = ez.recover(
+  loadUser(""),
+  ez.catchTag("INVALID_ID", () => ez.ok({ id: "guest" })),
+);
+```
+
+Use `catchTags` for a subset, `catchAllTags<R>()` for an exhaustive keyed recovery, and `catchAll`
+for an explicit fallback:
+
+```ts
+type LoadResult = ReturnType<typeof loadUser>;
+
+const recoverLoad = ez.recover(
+  ez.catchAllTags<LoadResult>()({
+    INVALID_ID: () => ez.ok({ id: "guest" }),
+  }),
+);
+
+const user = ez.getOr(recoverLoad(loadUser("")), { id: "guest" });
+```
+
+`getOr` requires a fallback assignable to the result's success type. `recover` accepts only
+synchronous handlers; use `recoverAsync` for sync or async handlers and promised inputs. Catcher
+descriptors are plain `{ handlers, fallback? }` data objects and can be reused.
 
 ## Exception snapshots and custom error fields
 
@@ -269,12 +332,12 @@ For example, JSON drops `ok(undefined).value`, cannot encode bigint or cycles, a
 Date/Map semantics. Structured clone rejects functions. The library does not silently rewrite
 success payloads; `normalizeCause` normalizes exception snapshots.
 
-## Incremental scope
+## Current scope
 
-This first implementation includes `ok`, `fail`, the three guards, result/extraction types, and
-`normalizeCause`. Failure factories, recovery chains, exception-catching adapters, and other
-convenience utilities are deferred. The old implementation remains reference material only; its
-names/signatures are not a compatibility contract.
+The public API includes constructors, narrowing guards, result/extraction types, cause
+normalization, exhaustive matching, composable recovery, and value fallback. Exception-catching
+adapters and failure factories are not part of the current API. The old implementation remains
+reference material only; its names and signatures are not a compatibility contract.
 
 ## Development
 
