@@ -3,12 +3,16 @@
  * Excluded from normal typecheck/build/lint; no @ts-expect-error suppressions here.
  */
 import {
+  catchAllTags,
   fail,
+  getOr,
   isError,
   isEzRez,
   isSuccess,
+  match,
   normalizeCause,
   ok,
+  recover,
   type ErrorOf,
   type EzRez,
   type Fail,
@@ -74,6 +78,23 @@ function divide(a: number, b: number) {
   if (b === 0) return fail("DIVIDE_BY_ZERO");
   return ok(a / b);
 }
+
+// Terminal matching is exhaustive for the result's finite branch union.
+const divisionMessage = match(divide(10, 0), {
+  success: (value) => `Result: ${value}`,
+  errors: {
+    DIVIDE_BY_ZERO: (failure) => failure.cause.message,
+  },
+});
+
+// Recovery callbacks return a new result; unhandled failures pass through.
+const recoverDivision = recover(
+  divide(10, 0),
+  catchAllTags<ReturnType<typeof divide>>()({
+    DIVIDE_BY_ZERO: () => ok(0),
+  }),
+);
+const divisionValue = getOr(recoverDivision, 0);
 
 const division = divide(10, 2);
 if (isSuccess(division)) {
