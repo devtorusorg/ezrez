@@ -52,6 +52,7 @@ it("keeps diagnostic context owned by the normalized native error", () => {
   const error = Object.assign(new Error("native"), { type: "CustomErrorKind" });
   const result = fail("NEW", error);
   expectTypeOf(result.tag).toEqualTypeOf<"NEW">();
+  expectTypeOf(result.cause.context.type).toEqualTypeOf<string>();
   expect(result.cause.context).toEqual({ type: "CustomErrorKind" });
   for (const transported of [JSON.parse(JSON.stringify(result)), structuredClone(result)]) {
     expect(transported).toEqual(result);

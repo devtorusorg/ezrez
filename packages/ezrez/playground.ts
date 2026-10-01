@@ -47,7 +47,7 @@ const unavailable = fail(
   "SERVICE_UNAVAILABLE",
   Object.assign(new Error("connection refused"), { status: 503 }),
 );
-unavailable.cause.context?.status; // 503
+unavailable.cause.context.status; // 503
 
 // A normalized snapshot can be passed as the primary cause too.
 const snapshot = normalizeCause(new Error("already normalized"));
