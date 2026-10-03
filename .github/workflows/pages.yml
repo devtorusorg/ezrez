@@ -29,9 +29,9 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
-      - run: bun run --filter @devtorus/ezrez-docs check
+      - run: bun run --filter @devtorusorg/ezrez-docs check
       - uses: actions/configure-pages@v6
-      - run: bun run --filter @devtorus/ezrez-docs build
+      - run: bun run --filter @devtorusorg/ezrez-docs build
       - uses: actions/upload-pages-artifact@v5
         with:
           path: apps/docs/dist
