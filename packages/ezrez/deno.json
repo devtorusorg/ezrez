@@ -1,6 +1,6 @@
 {
   "name": "@devtorusorg/ezrez",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "exports": {
     ".": "./src/index.ts",
     "./core": "./src/core/index.ts",
@@ -8,8 +8,17 @@
   },
   "license": "MIT",
   "publish": {
-    "include": ["src/index.ts", "src/core/**/*.ts", "src/utils/**/*.ts", "README.md", "LICENSE"],
-    "exclude": ["**/*.test.ts", "src/old_reference_implementation/**"]
+    "include": [
+      "src/index.ts",
+      "src/core/**/*.ts",
+      "src/utils/**/*.ts",
+      "README.md",
+      "LICENSE"
+    ],
+    "exclude": [
+      "**/*.test.ts",
+      "src/old_reference_implementation/**"
+    ]
   },
   "compilerOptions": {
     "strict": true
