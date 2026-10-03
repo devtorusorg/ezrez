@@ -6,7 +6,7 @@
       "extra-files": [
         {
           "type": "json",
-          "path": "packages/ezrez/deno.json",
+          "path": "deno.json",
           "jsonpath": "$.version"
         }
       ]
