@@ -6,7 +6,7 @@
       "name": "ezrez",
     },
     "apps/docs": {
-      "name": "@devtorus/ezrez-docs",
+      "name": "@devtorusorg/ezrez-docs",
       "version": "0.0.0",
       "devDependencies": {
         "@astrojs/check": "^0.9.10",
@@ -16,7 +16,7 @@
       },
     },
     "packages/ezrez": {
-      "name": "ezrez",
+      "name": "@devtorusorg/ezrez",
       "version": "0.1.0",
       "devDependencies": {
         "@biomejs/biome": "^2.5.13",
@@ -124,7 +124,7 @@
 
     "@ctrl/tinycolor": ["@ctrl/tinycolor@4.2.1", "", {}, "sha512-Vh5uy9Y1JBMId6J1f68TMXnZrTCvNdo9Fu2k0d1YnJngR+sM5kWTKl441c/3TFs+cG0NWOjRWgQ/iaWhbYx+7A=="],
 
-    "@devtorus/ezrez-docs": ["@devtorus/ezrez-docs@workspace:apps/docs"],
+    "@devtorusorg/ezrez-docs": ["@devtorusorg/ezrez-docs@workspace:apps/docs"],
 
     "@emmetio/abbreviation": ["@emmetio/abbreviation@2.3.3", "", { "dependencies": { "@emmetio/scanner": "^1.0.4" } }, "sha512-mgv58UrU3rh4YgbE/TzgLQwJ3pFsHHhCLqY20aJq+9comytTXUDNGG/SMtSeMJdkpxgXSXunBGLD8Boka3JyVA=="],
 
@@ -598,7 +598,7 @@
 
     "extend": ["extend@3.0.2", "", {}, "sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g=="],
 
-    "ezrez": ["ezrez@workspace:packages/ezrez"],
+    "@devtorusorg/ezrez": ["@devtorusorg/ezrez@workspace:packages/ezrez"],
 
     "fast-deep-equal": ["fast-deep-equal@3.1.3", "", {}, "sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q=="],
 

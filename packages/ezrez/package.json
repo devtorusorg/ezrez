@@ -1,5 +1,5 @@
 {
-  "name": "ezrez",
+  "name": "@devtorusorg/ezrez",
   "version": "0.1.0",
   "description": "A runtime-agnostic TypeScript library for browser and Node.js projects.",
   "license": "MIT",
@@ -17,6 +17,9 @@
     "commonjs"
   ],
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
