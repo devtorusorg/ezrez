@@ -8,40 +8,40 @@ literal error tags, optional helpers, and tree-shakeable ESM exports. No runtime
 ### npm
 
 ```sh
-bun add ezrez
+bun add @devtorusorg/ezrez
 ```
 
 ```ts
-import * as ezrez from "ezrez";
+import * as ezrez from "@devtorusorg/ezrez";
 ```
 
 CommonJS consumers are also supported:
 
 ```js
-const ezrez = require("ezrez");
+const ezrez = require("@devtorusorg/ezrez");
 ```
 
 ### JSR
 
 ```sh
-bunx jsr add @devtorus/ezrez
+bunx jsr add @devtorusorg/ezrez
 ```
 
 ```ts
-import * as ezrez from "@devtorus/ezrez";
+import * as ezrez from "@devtorusorg/ezrez";
 ```
 
 ## Entry points
 
 ```ts
-import * as ez from "ezrez";           // Core + utilities
-import * as core from "ezrez/core";    // Constructors, guards and types only
-import * as utils from "ezrez/utils";  // Matching, recovery, fallback and normalization
+import * as ez from "@devtorusorg/ezrez";           // Core + utilities
+import * as core from "@devtorusorg/ezrez/core";    // Constructors, guards and types only
+import * as utils from "@devtorusorg/ezrez/utils";  // Matching, recovery, fallback and normalization
 // Named imports work too:
-import { ok, fail, type EzRez } from "ezrez/core";
+import { ok, fail, type EzRez } from "@devtorusorg/ezrez/core";
 ```
 
-JSR has the same `/core` and `/utils` subpaths under `@devtorus/ezrez`.
+JSR has the same `/core` and `/utils` subpaths under `@devtorusorg/ezrez`.
 These are named module exports, not a constructed API object. Modern ESM bundlers can eliminate
 unused functions even with static namespace access (`ez.ok(...)`). Dynamic namespace access or
 passing the entire namespace around may retain more code. CommonJS tree shaking is not guaranteed.
@@ -50,8 +50,8 @@ Core never imports utilities; importing `ok` does not pull in cause normalizatio
 ## Native inference first
 
 ```ts
-import * as ez from "ezrez";
-import type { EzRez, ErrorOf, SuccessOf } from "ezrez";
+import * as ez from "@devtorusorg/ezrez";
+import type { EzRez, ErrorOf, SuccessOf } from "@devtorusorg/ezrez";
 
 function loadUser(id: string) {
   if (!id) {
@@ -112,7 +112,7 @@ widened to `string`; constructors cannot recover lost literals.
 ### Shorthand error types
 
 ```ts
-import { fail, ok, type EzFailOf, type EzRez } from "ezrez";
+import { fail, ok, type EzFailOf, type EzRez } from "@devtorusorg/ezrez";
 
 type DivideByZeroFailure = EzFailOf<"DIVIDE_BY_ZERO">;
 // Readonly<{
@@ -234,7 +234,7 @@ descriptors are plain `{ handlers, fallback? }` data objects and can be reused.
 ## Exception snapshots and custom error fields
 
 ```ts
-import { fail } from "ezrez";
+import { fail } from "@devtorusorg/ezrez";
 
 class HttpError extends Error {
   status = 503;
@@ -379,7 +379,7 @@ the tagged revision to npm and JSR.
 
 Before the first release:
 
-1. Create/link the `@devtorus/ezrez` package to this GitHub repository in JSR so its GitHub OIDC
+1. Create/link the `@devtorusorg/ezrez` package to this GitHub repository in JSR so its GitHub OIDC
    trusted publishing can succeed.
 2. Create an npm automation token for `ezrez` and save it as the repository `NPM_TOKEN` secret.
 3. Ensure GitHub Actions has permission to create pull requests and write contents. The publish

@@ -1,5 +1,5 @@
 {
-  "name": "@devtorus/ezrez",
+  "name": "@devtorusorg/ezrez",
   "version": "0.1.0",
   "exports": {
     ".": "./src/index.ts",

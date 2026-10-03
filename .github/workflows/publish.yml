@@ -13,18 +13,20 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
-      - run: bun run --filter ezrez check
-      - run: bun run --filter ezrez build
-      - run: npm publish
+      - run: bun run --filter @devtorusorg/ezrez check
+      - run: bun run --filter @devtorusorg/ezrez build
+      - run: npm publish --provenance
         working-directory: packages/ezrez
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: bunx jsr publish
         working-directory: packages/ezrez

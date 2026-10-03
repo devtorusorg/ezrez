@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const fixtureDirectory = mkdtempSync(join(tmpdir(), "ezrez-consumer-"));
-const packageDirectory = join(fixtureDirectory, "node_modules", "ezrez");
+const packageDirectory = join(fixtureDirectory, "node_modules", "@devtorusorg/ezrez");
 
 try {
   // Exercise the actual tarball, not a symlink that can hide missing published files.
@@ -34,8 +34,8 @@ try {
   for (const mode of ["module", "commonjs"]) {
     const imports =
       mode === "module"
-        ? 'import * as ez from "ezrez"; import * as core from "ezrez/core"; import * as utils from "ezrez/utils";'
-        : 'const ez = require("ezrez"), core = require("ezrez/core"), utils = require("ezrez/utils");';
+        ? 'import * as ez from "@devtorusorg/ezrez"; import * as core from "@devtorusorg/ezrez/core"; import * as utils from "@devtorusorg/ezrez/utils";'
+        : 'const ez = require("@devtorusorg/ezrez"), core = require("@devtorusorg/ezrez/core"), utils = require("@devtorusorg/ezrez/utils");';
     execFileSync(
       process.execPath,
       [
@@ -54,9 +54,9 @@ try {
   }
 
   const types = `
-    import * as ez from "ezrez";
-    import { ok, fail, isError, type EzRez, type EzFailOf, type ErrorOf } from "ezrez/core";
-    import { normalizeCause } from "ezrez/utils";
+    import * as ez from "@devtorusorg/ezrez";
+    import { ok, fail, isError, type EzRez, type EzFailOf, type ErrorOf } from "@devtorusorg/ezrez/core";
+    import { normalizeCause } from "@devtorusorg/ezrez/utils";
     const fn = (flag: boolean) => flag ? ok(1) : fail("IO", new Error());
     type E = ErrorOf<ReturnType<typeof fn>>;
     const normalized: (flag: boolean) => EzRez<number, "IO"> = fn;

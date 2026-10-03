@@ -23,7 +23,7 @@ async function bundle(name, source) {
 }
 
 try {
-  for (const entry of ["ezrez", "ezrez/core"]) {
+  for (const entry of ["@devtorusorg/ezrez", "@devtorusorg/ezrez/core"]) {
     for (const style of ["named", "namespace"]) {
       const source =
         style === "named"
@@ -41,7 +41,7 @@ try {
       console.log(`${entry} (${style}, ok only): ${Buffer.byteLength(output)} bytes`);
     }
   }
-  for (const entry of ["ezrez", "ezrez/utils"]) {
+  for (const entry of ["@devtorusorg/ezrez", "@devtorusorg/ezrez/utils"]) {
     const output = await bundle(
       `used-${entry.replaceAll("/", "-")}`,
       `import * as ez from "${entry}"; export const normalize = ez.normalizeCause;`,

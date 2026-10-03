@@ -8,7 +8,7 @@ description: Exhaustive matching, composable recovery, asynchronous handlers, an
 Use `match` when every branch should become a plain value:
 
 ```ts
-import { match } from "ezrez";
+import { match } from "@devtorusorg/ezrez";
 
 const message = match(result, {
   success: (user) => `Loaded ${user.name}`,
@@ -51,7 +51,7 @@ Recovery handlers return another ezrez result. Handled input failures are remove
 type; failures returned by handlers are added.
 
 ```ts
-import { catchTag, ok, recover } from "ezrez";
+import { catchTag, ok, recover } from "@devtorusorg/ezrez";
 
 const recovered = recover(
   result,
@@ -67,7 +67,7 @@ unmatched failure remains unchanged.
 Use `catchTags` for a subset or `catchAllTags` when every known tag must be handled:
 
 ```ts
-import { catchAllTags, recover } from "ezrez";
+import { catchAllTags, recover } from "@devtorusorg/ezrez";
 
 type LoadResult = ReturnType<typeof loadUser>;
 
@@ -124,7 +124,7 @@ constructors.
 Use `getOr` when only a success value or same-type fallback is needed:
 
 ```ts
-import { getOr } from "ezrez";
+import { getOr } from "@devtorusorg/ezrez";
 
 const port = getOr(parsePort(input), 3000);
 ```

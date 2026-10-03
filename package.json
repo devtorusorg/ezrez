@@ -6,11 +6,11 @@
   "scripts": {
     "build": "bun run --filter '*' build",
     "check": "bun run --filter '*' check",
-    "format": "bun run --filter ezrez format",
-    "format:check": "bun run --filter ezrez format:check",
-    "lint": "bun run --filter ezrez lint",
-    "docs:dev": "bun run --filter @devtorus/ezrez-docs dev",
-    "docs:build": "bun run --filter @devtorus/ezrez-docs build",
-    "docs:preview": "bun run --filter @devtorus/ezrez-docs preview"
+    "format": "bun run --filter @devtorusorg/ezrez format",
+    "format:check": "bun run --filter @devtorusorg/ezrez format:check",
+    "lint": "bun run --filter @devtorusorg/ezrez lint",
+    "docs:dev": "bun run --filter @devtorusorg/ezrez-docs dev",
+    "docs:build": "bun run --filter @devtorusorg/ezrez-docs build",
+    "docs:preview": "bun run --filter @devtorusorg/ezrez-docs preview"
   }
 }

@@ -8,20 +8,20 @@ description: Install ezrez and create your first typed result.
 ### npm
 
 ```sh
-bun add ezrez
-# or: npm install ezrez
+bun add @devtorusorg/ezrez
+# or: npm install @devtorusorg/ezrez
 ```
 
 ### JSR
 
 ```sh
-bunx jsr add @devtorus/ezrez
+bunx jsr add @devtorusorg/ezrez
 ```
 
 ## Create a result
 
 ```ts
-import { fail, isError, ok } from "ezrez";
+import { fail, isError, ok } from "@devtorusorg/ezrez";
 
 function parsePort(input: string) {
   const port = Number(input);
@@ -50,7 +50,7 @@ and correlated error context.
 ## Match every branch
 
 ```ts
-import { match } from "ezrez";
+import { match } from "@devtorusorg/ezrez";
 
 const message = match(parsePort("wrong"), {
   success: (port) => `Listening on ${port}`,
@@ -66,19 +66,19 @@ added.
 ## Entry points
 
 ```ts
-import * as ez from "ezrez";          // Core and utilities
-import * as core from "ezrez/core";   // Constructors, guards, and foundational types
-import * as utils from "ezrez/utils"; // Matching, recovery, fallback, and normalization
+import * as ez from "@devtorusorg/ezrez";          // Core and utilities
+import * as core from "@devtorusorg/ezrez/core";   // Constructors, guards, and foundational types
+import * as utils from "@devtorusorg/ezrez/utils"; // Matching, recovery, fallback, and normalization
 ```
 
 Named imports are supported and recommended when convenient:
 
 ```ts
-import { fail, match, ok, type EzRez } from "ezrez";
+import { fail, match, ok, type EzRez } from "@devtorusorg/ezrez";
 ```
 
 The npm package supports both ESM and CommonJS. JSR exposes the same root, `/core`, and `/utils`
-entry points under `@devtorus/ezrez`.
+entry points under `@devtorusorg/ezrez`.
 
 ## Next steps
 

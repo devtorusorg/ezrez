@@ -20,7 +20,7 @@ An ezrez result is a plain discriminated union. Successes contain a value; failu
 literal tag and a serializable error snapshot.
 
 ```ts
-import { fail, match, ok } from "ezrez";
+import { fail, match, ok } from "@devtorusorg/ezrez";
 
 function divide(a: number, b: number) {
   if (b === 0) return fail("DIVIDE_BY_ZERO");
@@ -43,6 +43,6 @@ const message = match(divide(10, 0), {
 
 ## Packages
 
-- npm: [`ezrez`](https://www.npmjs.com/package/ezrez)
-- JSR: [`@devtorus/ezrez`](https://jsr.io/@devtorus/ezrez)
-- Source: [`tiagobnobrega/ezrez`](https://github.com/tiagobnobrega/ezrez)
+- npm: [`@devtorusorg/ezrez`](https://www.npmjs.com/package/@devtorusorg/ezrez)
+- JSR: [`@devtorusorg/ezrez`](https://jsr.io/@devtorusorg/ezrez)
+- Source: [`devtorusorg/ezrez`](https://github.com/devtorusorg/ezrez)

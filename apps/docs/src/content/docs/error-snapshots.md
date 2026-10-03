@@ -8,7 +8,7 @@ description: Normalize native errors into safe, transportable diagnostic data.
 A tag-only failure receives a default snapshot:
 
 ```ts
-import { fail } from "ezrez";
+import { fail } from "@devtorusorg/ezrez";
 
 const result = fail("NOT_FOUND");
 
@@ -49,7 +49,7 @@ remain snapshot fields; custom own properties are copied into `context`.
 Use `normalizeCause(unknown)` when normalizing a caught exception without constructing a result:
 
 ```ts
-import { normalizeCause } from "ezrez/utils";
+import { normalizeCause } from "@devtorusorg/ezrez/utils";
 
 try {
   await runTask();

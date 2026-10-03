@@ -2,7 +2,7 @@
   "packages": {
     "packages/ezrez": {
       "release-type": "node",
-      "package-name": "ezrez",
+      "package-name": "@devtorusorg/ezrez",
       "extra-files": [
         {
           "type": "json",

@@ -13,14 +13,14 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bun run check
       - run: bun run build
-      - run: bun run --filter ezrez pack:check
-      - run: bun run --filter ezrez test:consumers
-      - run: bun run --filter ezrez test:tree-shaking
-      - run: bun run --filter ezrez jsr:check
+      - run: bun run --filter @devtorusorg/ezrez pack:check
+      - run: bun run --filter @devtorusorg/ezrez test:consumers
+      - run: bun run --filter @devtorusorg/ezrez test:tree-shaking
+      - run: bun run --filter @devtorusorg/ezrez jsr:check

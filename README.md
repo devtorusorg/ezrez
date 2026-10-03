@@ -2,7 +2,7 @@
 
 This repository contains the runtime-agnostic `ezrez` TypeScript library and its documentation site.
 
-- [`packages/ezrez`](packages/ezrez): publishable npm package (`ezrez`) and JSR package (`@devtorus/ezrez`)
+- [`packages/ezrez`](packages/ezrez): publishable npm package (`ezrez`) and JSR package (`@devtorusorg/ezrez`)
 - [`apps/docs`](apps/docs): Astro Starlight documentation site
 
 ## Development

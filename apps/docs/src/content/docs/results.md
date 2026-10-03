@@ -17,7 +17,7 @@ The failure parameter defaults to `never`, so `EzRez<number>` is success-only. I
 tag strings, complete `Fail` branches, or unions of both.
 
 ```ts
-import type { EzFailOf, EzRez } from "ezrez";
+import type { EzFailOf, EzRez } from "@devtorusorg/ezrez";
 
 type ParseResult = EzRez<number, "EMPTY" | "INVALID_NUMBER">;
 type ParseFailures = EzFailOf<"EMPTY" | "INVALID_NUMBER">;
@@ -30,7 +30,7 @@ type ParseFailures = EzFailOf<"EMPTY" | "INVALID_NUMBER">;
 Use `ok` for a success and `fail` for a failure:
 
 ```ts
-import { fail, ok } from "ezrez";
+import { fail, ok } from "@devtorusorg/ezrez";
 
 const success = ok({ id: "user-1" });
 const missing = fail("NOT_FOUND");
@@ -46,7 +46,7 @@ Failure envelopes contain exactly `tag` and `cause`. Put application diagnostics
 ## Narrowing guards
 
 ```ts
-import { isError, isSuccess } from "ezrez";
+import { isError, isSuccess } from "@devtorusorg/ezrez";
 
 if (isSuccess(result)) {
   result.value;
@@ -67,7 +67,7 @@ Use an application schema before treating external data as a specific `EzRez<Use
 ## Extracting branch types
 
 ```ts
-import type { ErrorOf, SuccessOf } from "ezrez";
+import type { ErrorOf, SuccessOf } from "@devtorusorg/ezrez";
 
 type Result = ReturnType<typeof parsePort>;
 type Port = SuccessOf<Result>;
@@ -86,7 +86,7 @@ Native inference is usually the most concise option. Use an annotation when an e
 must commit to a fixed contract:
 
 ```ts
-import { fail, ok, type EzRez } from "ezrez";
+import { fail, ok, type EzRez } from "@devtorusorg/ezrez";
 
 function findUser(id: string): EzRez<{ id: string }, "NOT_FOUND"> {
   return id === "user-1" ? ok({ id }) : fail("NOT_FOUND");
