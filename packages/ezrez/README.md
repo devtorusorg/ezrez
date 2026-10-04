@@ -373,22 +373,50 @@ to `tsconfig.json` unless you want those intentional errors to fail CI.
 
 ## Releases
 
-Release Please creates a release PR from conventional commits and synchronizes `package.json` and
-`deno.json` versions. Merging that PR creates a GitHub release; the publish workflow then releases
-the tagged revision to npm and JSR.
+Releases use Release Please, npm trusted publishing (OIDC), npm staged publishing, and JSR OIDC.
+No npm token or CI 2FA bypass is used.
 
-Before the first release:
+### One-time setup
 
-1. Create/link the `@devtorusorg/ezrez` package to this GitHub repository in JSR so its GitHub OIDC
-   trusted publishing can succeed.
-2. Create an npm automation token for `ezrez` and save it as the repository `NPM_TOKEN` secret.
-3. Ensure GitHub Actions has permission to create pull requests and write contents. The publish
-   workflow already requests `id-token: write` for JSR.
-4. Use Conventional Commit messages (`feat:`, `fix:`, `feat!:`, etc.) so Release Please can select
-   the appropriate version.
+1. Configure npm trusted publishing for `@devtorusorg/ezrez` with GitHub organization
+   `devtorusorg`, repository `ezrez`, workflow filename `publish.yml`, and no environment. Allow
+   `npm stage publish`; direct `npm publish` may remain disabled.
+2. Link `@devtorusorg/ezrez` to `devtorusorg/ezrez` in JSR package settings.
+3. Allow GitHub Actions to create pull requests in the repository or organization Actions settings.
 
-The initial Release Please manifest is version `0.1.0`. Adjust it before enabling releases if the
-first published version should differ.
+### Publish a release
+
+1. Merge release-worthy Conventional Commits to `main`: `feat:` creates a minor release, `fix:` a
+   patch release, and `feat!:` or `BREAKING CHANGE:` a major release. `chore:` and `docs:` do not
+   normally create a release.
+2. Release Please opens a release PR. Review its version and changelog changes, then merge it. This
+   creates a GitHub release and a tag such as `ezrez-v0.2.0`.
+3. Stage the tagged npm package. GitHub releases created by Release Please do not automatically
+   dispatch this workflow, so run it manually:
+
+   ```sh
+   gh workflow run "Stage npm release" --repo devtorusorg/ezrez --ref main \
+     -f tag=ezrez-v0.2.0
+   ```
+
+4. Wait for the workflow to succeed, then inspect the package in npmjs.com under **Staged Packages**.
+   Approve it with your npm 2FA device. Only approval makes the package publicly installable.
+5. After npm approval, publish the same tag to JSR:
+
+   ```sh
+   gh workflow run "Publish JSR" --repo devtorusorg/ezrez --ref main \
+     -f tag=ezrez-v0.2.0
+   ```
+
+6. Verify both registries:
+
+   ```sh
+   npm view @devtorusorg/ezrez version dist-tags
+   curl -fsSL https://jsr.io/@devtorusorg/ezrez/meta.json
+   ```
+
+Replace `ezrez-v0.2.0` with the tag created by the release PR. The `Stage npm release` workflow
+uses OIDC to upload a non-public staged package; npm approval remains the human release gate.
 
 ## License
 
