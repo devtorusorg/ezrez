@@ -7,7 +7,8 @@
       "!**/dist/**",
       "!**/coverage/**",
       "!**/old_reference_implementation/**",
-      "!**/playground.ts"
+      "!**/playground.ts",
+      "!packages/ezrez/deno.json"
     ]
   },
   "formatter": {
