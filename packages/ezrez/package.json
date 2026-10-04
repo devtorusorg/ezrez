@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "A runtime-agnostic TypeScript library for browser and Node.js projects.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devtorusorg/ezrez.git"
+  },
   "type": "module",
   "packageManager": "bun@1.4.2",
   "engines": {
