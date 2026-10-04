@@ -3,6 +3,7 @@
     "packages/ezrez": {
       "release-type": "node",
       "package-name": "@devtorusorg/ezrez",
+      "initial-version": "0.1.0",
       "extra-files": [
         {
           "type": "json",
