@@ -1,4 +1,4 @@
-name: Stage npm release
+name: Publish
 
 on:
   release:
@@ -36,5 +36,7 @@ jobs:
       - run: bun run --filter @devtorusorg/ezrez lint && bun run --filter @devtorusorg/ezrez typecheck && bun run --filter @devtorusorg/ezrez test
         if: github.event_name == 'workflow_dispatch'
       - run: bun run --filter @devtorusorg/ezrez build
-      - run: npm stage publish
+      - run: npm publish --provenance
+        working-directory: packages/ezrez
+      - run: bunx jsr publish
         working-directory: packages/ezrez
