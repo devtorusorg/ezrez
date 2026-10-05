@@ -78,7 +78,18 @@ function snapshot(
   return output;
 }
 
-/** Creates a success result while preserving the exact payload type. */
+/**
+ * Creates a success result while preserving the exact payload type.
+ *
+ * @typeParam S - Success payload type.
+ * @param value - Value carried by the success branch.
+ * @returns A `{ tag: "success", value }` result.
+ *
+ * @example
+ * ```ts
+ * const result = ok({ id: "user-1" });
+ * ```
+ */
 export function ok<S>(value: S): Ok<S> {
   return { tag: "success", value };
 }
@@ -91,7 +102,19 @@ export function fail<const Tag extends string, const D extends Error | ErrorDesc
 export function fail<const F extends TaggedDescriptor>(
   input: ValidTaggedDescriptor<F>,
 ): Fail<F["tag"], FailureCauseOf<F>>;
-/** Creates an exact failure envelope with a normalized, non-null error snapshot. */
+/**
+ * Creates an exact failure envelope with a normalized, non-null error snapshot.
+ *
+ * @param input - Failure tag or an inline tagged descriptor.
+ * @param descriptor - Optional native error or snapshot descriptor for a tag input.
+ * @returns A failure result preserving the literal tag and inferred cause context.
+ * @throws {TypeError} If the tag is `"success"` or the descriptor has unsupported fields.
+ *
+ * @example
+ * ```ts
+ * const result = fail("NOT_FOUND", { message: "User does not exist" });
+ * ```
+ */
 export function fail(
   input: string | TaggedDescriptor,
   descriptor?: Error | ErrorDescriptor,

@@ -31,7 +31,15 @@ function tagged<Tag extends string, Handler>(tag: Tag, handler: Handler): TagCat
   return { handlers: { [tag]: handler } } as TagCatcher<Tag, Handler>;
 }
 
-/** Handles one tag. Use `catchTag<R>()` when the handler needs R's exact correlated cause type. */
+/**
+ * Creates a catcher for one failure tag.
+ *
+ * Call `catchTag<R>()` first when the handler needs `R`'s exact correlated cause type.
+ *
+ * @param tag - Failure tag to handle.
+ * @param handler - Callback that returns a replacement result.
+ * @returns Reusable catcher descriptor for {@link recover} or {@link recoverAsync}.
+ */
 export function catchTag<const Tag extends string, Handler extends (failure: Fail<Tag>) => unknown>(
   tag: Tag,
   handler: Handler,
@@ -50,7 +58,14 @@ export function catchTag(tag?: unknown, handler?: unknown): unknown {
   return tagged(tag as string, handler);
 }
 
-/** Handles the supplied subset of tags. Use `catchTags<R>()` for exact callback types. */
+/**
+ * Creates a catcher for a supplied subset of failure tags.
+ *
+ * Call `catchTags<R>()` first for exact callback types.
+ *
+ * @param handlers - Map from failure tags to replacement-result callbacks.
+ * @returns Reusable catcher descriptor for {@link recover} or {@link recoverAsync}.
+ */
 export function catchTags<Handlers extends Record<string, (failure: Fail<string>) => unknown>>(
   handlers: Handlers,
 ): TagsCatcher<Handlers>;
@@ -65,7 +80,11 @@ export function catchTags(handlers?: unknown): unknown {
   return { handlers };
 }
 
-/** Handles every finite tag. The typed form rejects missing and unknown keys. */
+/**
+ * Creates an exhaustive catcher for every finite failure tag.
+ *
+ * @returns A function that accepts a complete failure-tag handler map.
+ */
 export function catchAllTags<R extends AnyResult>(): <
   const Handlers extends { [Tag in FailureTags<R>]: HandlerFor<R, Tag> },
 >(
@@ -79,7 +98,12 @@ export function catchAllTags(handlers?: unknown): unknown {
   return { handlers };
 }
 
-/** Handles every failure with an explicit fallback callback. */
+/**
+ * Creates a catcher with an explicit fallback for every failure.
+ *
+ * @param handler - Callback that receives any failure branch and returns a replacement result.
+ * @returns Reusable fallback catcher descriptor.
+ */
 export function catchAll<R extends AnyResult>(): <Handler extends AllHandlerFor<R>>(
   handler: Handler,
 ) => AllCatcher<Handler>;
@@ -148,7 +172,20 @@ function handlerFor(catcher: AnyCatcher, tag: string): CatchHandler | undefined 
   return (catcher.handlers as CatchHandlers)[tag];
 }
 
-/** Applies the first matching catcher. Unmatched failures pass through unchanged. */
+/**
+ * Applies the first matching synchronous catcher.
+ *
+ * Unmatched failures and successes pass through unchanged. It supports direct and curried forms.
+ *
+ * @param result - Result to recover, when using the direct form.
+ * @param catchers - Catcher descriptors applied in order.
+ * @returns The recovered result, preserving unhandled failure branches.
+ *
+ * @example
+ * ```ts
+ * const result = recover(fail("NOT_FOUND"), catchTag("NOT_FOUND", () => ok("guest")));
+ * ```
+ */
 export function recover<R extends AnyResult, const Catchers extends readonly AnyCatcher[]>(
   result: R,
   ...catchers: Catchers & SynchronousCatchers<Catchers>
@@ -172,7 +209,13 @@ export function recover(...args: unknown[]) {
   return hasResult ? apply(args[0] as AnyResult) : apply;
 }
 
-/** Async runner for the same catcher descriptors. */
+/**
+ * Applies catcher descriptors to a result or promise of a result.
+ *
+ * Handlers may return either results or promises of results.
+ *
+ * @returns A promise of the recovered result.
+ */
 export function recoverAsync<R extends AnyResult, const Catchers extends readonly AnyCatcher[]>(
   result: R | PromiseLike<R>,
   ...catchers: Catchers
