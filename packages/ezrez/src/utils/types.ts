@@ -1,13 +1,16 @@
 import type { AnyResult, ErrorOf, Fail, Ok, SuccessOf } from "../core/types.js";
 
+/** Extracts the finite failure-tag union from a result type. */
 export type FailureTags<R extends AnyResult> =
   ErrorOf<R> extends infer E ? (E extends { tag: infer Tag extends string } ? Tag : never) : never;
 
+/** Extracts the correlated failure branch for one tag. */
 export type FailureForTag<R extends AnyResult, Tag extends string> = Extract<
   ErrorOf<R>,
   { tag: Tag }
 >;
 
+/** Callback type for handling one correlated failure tag. */
 export type ErrorHandler<R extends AnyResult, Tag extends FailureTags<R>> = (
   failure: FailureForTag<R, Tag>,
 ) => unknown;
@@ -21,6 +24,7 @@ export type MatchCases<R extends AnyResult> = (HasSuccess<R> extends true
   ? { success: (value: SuccessOf<R>) => unknown }
   : { success?: never }) & { errors: ErrorCases<R> };
 
+/** Exhaustive match cases whose callbacks may return promises. */
 export type AsyncMatchCases<R extends AnyResult> = (HasSuccess<R> extends true
   ? { success: (value: SuccessOf<R>) => unknown | PromiseLike<unknown> }
   : { success?: never }) & {
@@ -40,6 +44,7 @@ export type ExactMatchCases<R extends AnyResult, Cases extends MatchCases<R>> = 
 > &
   ExactKeys<Cases["errors"], ErrorCases<R>>;
 
+/** Union of callback return values from a synchronous match. */
 export type MatchOutput<R extends AnyResult, Cases extends MatchCases<R>> =
   | (Cases extends { success: (...args: never[]) => infer Output } ? Output : never)
   | {
@@ -48,6 +53,7 @@ export type MatchOutput<R extends AnyResult, Cases extends MatchCases<R>> =
         : never;
     }[FailureTags<R>];
 
+/** Awaited union of callback return values from an asynchronous match. */
 export type AsyncMatchOutput<R extends AnyResult, Cases extends AsyncMatchCases<R>> = Awaited<
   | (Cases extends { success: (...args: never[]) => infer Output } ? Output : never)
   | {

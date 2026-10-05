@@ -8,7 +8,22 @@ import type {
   MatchOutput,
 } from "./types.js";
 
-/** Exhaustively consumes a finite result branch union. */
+/**
+ * Exhaustively consumes a finite result branch union.
+ *
+ * It supports direct and curried forms. Every possible failure tag needs a correlated handler.
+ *
+ * @param result - Result to consume, when using the direct form.
+ * @param cases - Success and failure handlers.
+ * @returns The union of handler return values.
+ *
+ * @example
+ * ```ts
+ * const message = match(fail("NOT_FOUND"), {
+ *   errors: { NOT_FOUND: () => "Missing" },
+ * });
+ * ```
+ */
 export function match<R extends AnyResult, const Cases extends MatchCases<R>>(
   result: R,
   cases: Cases & ExactMatchCases<R, Cases>,
@@ -32,7 +47,11 @@ export function match(result?: unknown, cases?: unknown): unknown {
   return apply(result as AnyResult, cases as MatchCases<AnyResult>);
 }
 
-/** Async exhaustive match. It accepts a result or promised result and always returns a Promise. */
+/**
+ * Asynchronously exhaustively consumes a result or promised result.
+ *
+ * @returns A promise of the union of awaited handler return values.
+ */
 export function matchAsync<R extends AnyResult, const Cases extends AsyncMatchCases<R>>(
   result: R | PromiseLike<R>,
   cases: Cases,
