@@ -1,3 +1,8 @@
+/**
+ * @module
+ * Matching, recovery, fallback, and error-normalization utilities for EzRez values.
+ */
+
 export { catchAll, catchAllTags, catchTag, catchTags, recover, recoverAsync } from "./catch.js";
 export { getOr } from "./get-or.js";
 export { match, matchAsync } from "./match.js";

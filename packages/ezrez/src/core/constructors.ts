@@ -78,6 +78,7 @@ function snapshot(
   return output;
 }
 
+/** Creates a success result while preserving the exact payload type. */
 export function ok<S>(value: S): Ok<S> {
   return { tag: "success", value };
 }

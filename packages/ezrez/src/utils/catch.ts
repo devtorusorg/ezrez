@@ -11,8 +11,11 @@ export type Catcher<Handlers extends object = CatchHandlers, Fallback = undefine
   fallback?: Fallback;
 }>;
 
+/** A catcher descriptor for one failure tag. */
 export type TagCatcher<Tag extends string, Handler> = Catcher<Readonly<Record<Tag, Handler>>>;
+/** A catcher descriptor for a subset of failure tags. */
 export type TagsCatcher<Handlers extends object> = Catcher<Handlers>;
+/** A catcher descriptor with an explicit fallback for every failure. */
 export type AllCatcher<Handler> = Catcher<Readonly<Record<never, never>>, Handler> &
   Readonly<{ fallback: Handler }>;
 
@@ -76,6 +79,7 @@ export function catchAllTags(handlers?: unknown): unknown {
   return { handlers };
 }
 
+/** Handles every failure with an explicit fallback callback. */
 export function catchAll<R extends AnyResult>(): <Handler extends AllHandlerFor<R>>(
   handler: Handler,
 ) => AllCatcher<Handler>;

@@ -7,12 +7,14 @@ const snapshotKeys: Record<string, true> = {
   context: true,
 };
 
+/** Narrows a typed result to its success branch. */
 export function isSuccess<R extends AnyResult>(
   result: R,
 ): result is Extract<R, { tag: "success" }> {
   return result.tag === "success";
 }
 
+/** Narrows a typed result to one of its failure branches. */
 export function isError<R extends AnyResult>(
   result: R,
 ): result is Extract<R, { cause: ErrorSnapshot }> {
