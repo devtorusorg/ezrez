@@ -7,8 +7,10 @@ export type JsonValue =
   | readonly JsonValue[]
   | { readonly [key: string]: JsonValue };
 
+/** JSON-safe diagnostic fields attached to an error snapshot. */
 export type ErrorContext = Readonly<Record<string, JsonValue>>;
 
+/** A serializable representation of a native or application error. */
 export interface ErrorSnapshot {
   readonly name: string;
   readonly message: string;
@@ -61,8 +63,11 @@ export type EzRez<S, E extends string | AnyFailure = never> =
 /** Broad boundary type for guards and generic utilities, not a default error. */
 export type AnyResult = Ok<unknown> | AnyFailure;
 
+/** Extracts the success payload type from a result union. */
 export type SuccessOf<R> = R extends { tag: "success"; value: infer S } ? S : never;
+/** Extracts complete failure branches from a result union. */
 export type ErrorOf<R> = R extends AnyFailure ? R : never;
+/** Rebuilds a result union from its success payload and failure branches. */
 export type Normalize<R extends AnyResult> = EzRez<SuccessOf<R>, ErrorOf<R>>;
 
 /** Flattens intersections while preserving the visible shape of a type. */
@@ -103,6 +108,7 @@ type NativeCause<D extends Error> =
     ? ErrorSnapshot
     : ErrorSnapshotWithContext<NativeErrorContext<D>>;
 
+/** Infers the normalized error snapshot created from a descriptor or native error. */
 export type FailureCauseOf<D> = D extends Error ? NativeCause<D> : DescriptorCause<D>;
 
 /** Constructor shorthand or an inline tagged error descriptor. */
@@ -111,6 +117,7 @@ export type FailureInput<Tag extends string = string> =
   | Readonly<{ tag: Tag } & ErrorDescriptor>;
 
 /** Resolve either constructor input form to its exact failure envelope. */
+/** Resolves a failure constructor input to its exact failure envelope. */
 export type WithCause<F extends FailureInput> = F extends string
   ? Fail<F>
   : F extends { tag: infer Tag extends string }

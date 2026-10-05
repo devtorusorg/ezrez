@@ -7,12 +7,26 @@ const snapshotKeys: Record<string, true> = {
   context: true,
 };
 
+/**
+ * Narrows a typed result to its success branch.
+ *
+ * @typeParam R - Result union being narrowed.
+ * @param result - Result to inspect.
+ * @returns Whether `result` is the success branch.
+ */
 export function isSuccess<R extends AnyResult>(
   result: R,
 ): result is Extract<R, { tag: "success" }> {
   return result.tag === "success";
 }
 
+/**
+ * Narrows a typed result to one of its failure branches.
+ *
+ * @typeParam R - Result union being narrowed.
+ * @param result - Result to inspect.
+ * @returns Whether `result` is a failure branch.
+ */
 export function isError<R extends AnyResult>(
   result: R,
 ): result is Extract<R, { cause: ErrorSnapshot }> {
@@ -97,7 +111,14 @@ function snapshot(candidate: unknown): candidate is ErrorSnapshot {
   return true;
 }
 
-/** Structural boundary guard only: does not validate application payloads or error tags. */
+/**
+ * Checks whether an unknown value is an exact EzRez envelope with a valid error snapshot.
+ *
+ * This is a structural boundary guard: it does not validate success payloads or application tags.
+ *
+ * @param candidate - Unknown value received at a trust boundary.
+ * @returns Whether the value has a valid EzRez envelope shape.
+ */
 export function isEzRez(candidate: unknown): candidate is AnyResult {
   try {
     if (!object(candidate)) return false;
