@@ -5,8 +5,12 @@
 
 ### Bug Fixes
 
-* add npm repository metadata ([8288fc8](https://github.com/devtorusorg/ezrez/commit/8288fc83aaf9df851ae81cbb2e16de725d389ab3))
-* add npm repository metadata ([b071a44](https://github.com/devtorusorg/ezrez/commit/b071a44fee9d50fb03457786210c3793f44b091b))
+* configure npm trusted-publishing metadata ([8288fc8](https://github.com/devtorusorg/ezrez/commit/8288fc83aaf9df851ae81cbb2e16de725d389ab3))
+
+### Documentation
+
+* add module and API reference documentation for JSR
+* document the direct OIDC release process
 
 ## 0.1.0 (2026-10-04)
 
